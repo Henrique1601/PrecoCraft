@@ -5,9 +5,11 @@ export interface SerializedOffer {
   id: string;
   productId: string;
   store: StoreType;
+  sellerName: string | null;
   url: string;
   titleSnapshot: string | null;
   basePrice: number;
+  previousBasePrice: number | null;
   shippingCost: number;
   discountAmount: number;
   cashbackAmount: number;
@@ -21,6 +23,8 @@ export interface SerializedProduct {
   listId: string;
   name: string;
   notes: string | null;
+  targetPrice: number | null;
+  purchased: boolean;
   createdAt: string;
   offers: SerializedOffer[];
 }
@@ -37,15 +41,33 @@ export function serializeOffer(offer: StoreOffer): SerializedOffer {
     id: offer.id,
     productId: offer.productId,
     store: offer.store as StoreType,
+    sellerName: offer.sellerName,
     url: offer.url,
     titleSnapshot: offer.titleSnapshot,
     basePrice: Number(offer.basePrice),
+    previousBasePrice:
+      offer.previousBasePrice !== null ? Number(offer.previousBasePrice) : null,
     shippingCost: Number(offer.shippingCost),
     discountAmount: Number(offer.discountAmount),
     cashbackAmount: Number(offer.cashbackAmount),
     inStock: offer.inStock,
     sourceMode: offer.sourceMode,
     lastCheckedAt: offer.lastCheckedAt.toISOString(),
+  };
+}
+
+export function serializeProduct(
+  p: Product & { offers: StoreOffer[] }
+): SerializedProduct {
+  return {
+    id: p.id,
+    listId: p.listId,
+    name: p.name,
+    notes: p.notes,
+    targetPrice: p.targetPrice !== null ? Number(p.targetPrice) : null,
+    purchased: p.purchased,
+    createdAt: p.createdAt.toISOString(),
+    offers: p.offers.map(serializeOffer),
   };
 }
 
@@ -58,13 +80,6 @@ export function serializeList(
     id: list.id,
     name: list.name,
     createdAt: list.createdAt.toISOString(),
-    products: list.products.map((p) => ({
-      id: p.id,
-      listId: p.listId,
-      name: p.name,
-      notes: p.notes,
-      createdAt: p.createdAt.toISOString(),
-      offers: p.offers.map(serializeOffer),
-    })),
+    products: list.products.map(serializeProduct),
   };
 }

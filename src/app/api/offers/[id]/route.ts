@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { serializeOffer } from "@/lib/serializers";
 
 const patchOfferSchema = z.object({
+  sellerName: z.string().trim().max(80).nullable().optional(),
   url: z.string().url().optional(),
   titleSnapshot: z.string().trim().max(240).nullable().optional(),
   basePrice: z.number().nonnegative().optional(),
@@ -33,13 +34,22 @@ export async function PATCH(
   }
 
   const d = parsed.data;
+  const existing = await prisma.storeOffer.findUnique({ where: { id } });
+  const oldBase = existing ? Number(existing.basePrice) : null;
+  const priceChanged =
+    d.basePrice !== undefined &&
+    oldBase !== null &&
+    Math.abs(oldBase - d.basePrice) >= 0.01;
+
   const updated = await prisma.storeOffer.update({
     where: { id },
     data: {
+      ...(d.sellerName !== undefined ? { sellerName: d.sellerName } : {}),
       ...(d.url !== undefined ? { url: d.url } : {}),
       ...(d.titleSnapshot !== undefined
         ? { titleSnapshot: d.titleSnapshot }
         : {}),
+      ...(priceChanged ? { previousBasePrice: oldBase } : {}),
       ...(d.basePrice !== undefined ? { basePrice: d.basePrice } : {}),
       ...(d.shippingCost !== undefined ? { shippingCost: d.shippingCost } : {}),
       ...(d.discountAmount !== undefined

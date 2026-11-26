@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, RefreshCw, Trash2, X } from "lucide-react";
+import { ExternalLink, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import {
   calculateFinalPrice,
   formatBRL,
@@ -14,7 +14,7 @@ interface OfferCellModalProps {
   productId: string;
   productName: string;
   store: StoreType;
-  offer: SerializedOffer | null;
+  offers: SerializedOffer[];
   onClose: () => void;
   onSaved: (offer: SerializedOffer) => void;
   onDeleted: (offerId: string) => void;
@@ -24,29 +24,48 @@ export function OfferCellModal({
   productId,
   productName,
   store,
-  offer,
+  offers,
   onClose,
   onSaved,
   onDeleted,
 }: OfferCellModalProps) {
   const meta = STORE_META[store];
-  const [url, setUrl] = useState(offer?.url ?? "");
+  const [selectedId, setSelectedId] = useState<string>(
+    offers[0]?.id ?? "__new__"
+  );
+  const activeOffer = offers.find((o) => o.id === selectedId) ?? null;
+
+  const [sellerName, setSellerName] = useState(activeOffer?.sellerName ?? "");
+  const [url, setUrl] = useState(activeOffer?.url ?? "");
   const [basePrice, setBasePrice] = useState(
-    offer ? String(offer.basePrice) : ""
+    activeOffer ? String(activeOffer.basePrice) : ""
   );
   const [shippingCost, setShippingCost] = useState(
-    offer ? String(offer.shippingCost) : "0"
+    activeOffer ? String(activeOffer.shippingCost) : "0"
   );
   const [discountAmount, setDiscountAmount] = useState(
-    offer ? String(offer.discountAmount) : "0"
+    activeOffer ? String(activeOffer.discountAmount) : "0"
   );
   const [cashbackAmount, setCashbackAmount] = useState(
-    offer ? String(offer.cashbackAmount) : "0"
+    activeOffer ? String(activeOffer.cashbackAmount) : "0"
   );
-  const [inStock, setInStock] = useState(offer?.inStock ?? true);
+  const [inStock, setInStock] = useState(activeOffer?.inStock ?? true);
   const [saving, setSaving] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  function selectOffer(id: string) {
+    setSelectedId(id);
+    const next = offers.find((o) => o.id === id) ?? null;
+    setSellerName(next?.sellerName ?? "");
+    setUrl(next?.url ?? "");
+    setBasePrice(next ? String(next.basePrice) : "");
+    setShippingCost(next ? String(next.shippingCost) : "0");
+    setDiscountAmount(next ? String(next.discountAmount) : "0");
+    setCashbackAmount(next ? String(next.cashbackAmount) : "0");
+    setInStock(next?.inStock ?? true);
+    setMessage(null);
+  }
 
   const previewFinal = calculateFinalPrice({
     basePrice: Number(basePrice.replace(",", ".")) || 0,
@@ -65,8 +84,10 @@ export function OfferCellModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: activeOffer?.id,
           productId,
           store,
+          sellerName: sellerName.trim() || null,
           url: url.trim(),
           basePrice: Number.isNaN(parsedBase) ? undefined : parsedBase,
           shippingCost: Number(shippingCost.replace(",", ".")) || 0,
@@ -92,14 +113,14 @@ export function OfferCellModal({
   }
 
   async function handleAutoFetch() {
-    if (!offer?.id) return;
+    if (!activeOffer?.id) return;
     setFetching(true);
     setMessage(null);
     try {
       const res = await fetch("/api/offers/refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ offerId: offer.id }),
+        body: JSON.stringify({ offerId: activeOffer.id }),
       });
       const data = await res.json();
       const first = data.results?.[0];
@@ -119,12 +140,14 @@ export function OfferCellModal({
   }
 
   async function handleDelete() {
-    if (!offer?.id) return;
+    if (!activeOffer?.id) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/offers/${offer.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/offers/${activeOffer.id}`, {
+        method: "DELETE",
+      });
       if (res.ok) {
-        onDeleted(offer.id);
+        onDeleted(activeOffer.id);
         onClose();
       }
     } finally {
@@ -155,7 +178,53 @@ export function OfferCellModal({
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-5 space-y-4">
+        {/* Multi-seller switcher */}
+        {offers.length > 0 && (
+          <div className="px-5 pt-3 flex items-center gap-1.5 overflow-x-auto">
+            {offers.map((o, idx) => (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => selectOffer(o.id)}
+                className={`px-2.5 py-1 text-[11px] font-medium rounded-md border shrink-0 ${
+                  selectedId === o.id
+                    ? "bg-zinc-900 text-white border-zinc-900"
+                    : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100"
+                }`}
+              >
+                {o.sellerName || `Oferta ${idx + 1}`} (
+                {formatBRL(calculateFinalPrice(o))})
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => selectOffer("__new__")}
+              className={`px-2.5 py-1 text-[11px] font-medium rounded-md border shrink-0 flex items-center gap-1 ${
+                selectedId === "__new__"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-emerald-700 border-emerald-300 hover:bg-emerald-50"
+              }`}
+            >
+              <Plus className="w-3 h-3" />
+              Outro vendedor
+            </button>
+          </div>
+        )}
+
+        <form onSubmit={handleSave} className="p-5 space-y-3.5">
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 mb-1">
+              Vendedor / Loja (opcional)
+            </label>
+            <input
+              type="text"
+              value={sellerName}
+              onChange={(e) => setSellerName(e.target.value)}
+              placeholder="Ex: Loja Oficial, Vendedor SP..."
+              className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-medium text-zinc-700 mb-1">
               Link do anúncio
@@ -270,7 +339,7 @@ export function OfferCellModal({
 
           <div className="flex items-center justify-between pt-2 border-t border-zinc-100">
             <div className="flex items-center gap-2">
-              {offer && (
+              {activeOffer && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -281,7 +350,7 @@ export function OfferCellModal({
                   Remover
                 </button>
               )}
-              {offer && meta.autoRefresh && (
+              {activeOffer && meta.autoRefresh && (
                 <button
                   type="button"
                   onClick={handleAutoFetch}

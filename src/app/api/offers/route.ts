@@ -7,8 +7,10 @@ import { serializeOffer } from "@/lib/serializers";
 import { refreshOfferFromStore } from "@/lib/connectors";
 
 const upsertOfferSchema = z.object({
+  id: z.string().optional(),
   productId: z.string().min(1),
   store: z.enum(STORE_TYPES),
+  sellerName: z.string().trim().max(80).nullable().optional(),
   url: z.string().url(),
   titleSnapshot: z.string().trim().max(240).nullable().optional(),
   basePrice: z.number().nonnegative().optional(),
@@ -40,7 +42,6 @@ export async function POST(req: Request) {
   let sourceMode = data.sourceMode ?? "MANUAL";
   let autoMessage: string | undefined;
 
-  // If user pasted a URL for an auto-supported store and didn't specify a price (or requested autoFetch)
   if (data.autoFetch || data.basePrice === undefined) {
     const fetched = await refreshOfferFromStore(data.store, data.url);
     if (fetched.ok && fetched.basePrice !== undefined) {
@@ -53,16 +54,47 @@ export async function POST(req: Request) {
     }
   }
 
-  const offer = await prisma.storeOffer.upsert({
-    where: {
-      productId_store: {
-        productId: data.productId,
+  if (data.id) {
+    const existing = await prisma.storeOffer.findUnique({
+      where: { id: data.id },
+    });
+    const oldBase = existing ? Number(existing.basePrice) : null;
+    const priceChanged = oldBase !== null && Math.abs(oldBase - basePrice) >= 0.01;
+
+    const updated = await prisma.storeOffer.update({
+      where: { id: data.id },
+      data: {
         store: data.store,
+        sellerName: data.sellerName ?? null,
+        url: data.url,
+        ...(titleSnapshot !== null ? { titleSnapshot } : {}),
+        ...(priceChanged ? { previousBasePrice: oldBase } : {}),
+        basePrice,
+        ...(data.shippingCost !== undefined
+          ? { shippingCost: data.shippingCost }
+          : {}),
+        ...(data.discountAmount !== undefined
+          ? { discountAmount: data.discountAmount }
+          : {}),
+        ...(data.cashbackAmount !== undefined
+          ? { cashbackAmount: data.cashbackAmount }
+          : {}),
+        inStock,
+        sourceMode,
+        lastCheckedAt: new Date(),
       },
-    },
-    create: {
+    });
+    return NextResponse.json({
+      offer: serializeOffer(updated),
+      warning: autoMessage,
+    });
+  }
+
+  const created = await prisma.storeOffer.create({
+    data: {
       productId: data.productId,
       store: data.store,
+      sellerName: data.sellerName ?? null,
       url: data.url,
       titleSnapshot,
       basePrice,
@@ -73,27 +105,10 @@ export async function POST(req: Request) {
       sourceMode,
       lastCheckedAt: new Date(),
     },
-    update: {
-      url: data.url,
-      ...(titleSnapshot !== null ? { titleSnapshot } : {}),
-      basePrice,
-      ...(data.shippingCost !== undefined
-        ? { shippingCost: data.shippingCost }
-        : {}),
-      ...(data.discountAmount !== undefined
-        ? { discountAmount: data.discountAmount }
-        : {}),
-      ...(data.cashbackAmount !== undefined
-        ? { cashbackAmount: data.cashbackAmount }
-        : {}),
-      inStock,
-      sourceMode,
-      lastCheckedAt: new Date(),
-    },
   });
 
   return NextResponse.json({
-    offer: serializeOffer(offer),
+    offer: serializeOffer(created),
     warning: autoMessage,
   });
 }

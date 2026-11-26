@@ -3,15 +3,17 @@ import { z } from "zod";
 import { isAuthenticated } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { STORE_TYPES } from "@/lib/pricing";
-import { serializeOffer } from "@/lib/serializers";
+import { serializeProduct } from "@/lib/serializers";
 
 const createProductSchema = z.object({
   listId: z.string().min(1),
   name: z.string().trim().min(1).max(160),
   notes: z.string().trim().max(300).optional(),
+  targetPrice: z.number().nonnegative().nullable().optional(),
   initialOffer: z
     .object({
       store: z.enum(STORE_TYPES),
+      sellerName: z.string().trim().max(80).optional(),
       url: z.string().url(),
       titleSnapshot: z.string().optional(),
       basePrice: z.number().nonnegative(),
@@ -36,16 +38,18 @@ export async function POST(req: Request) {
     );
   }
 
-  const { listId, name, notes, initialOffer } = parsed.data;
+  const { listId, name, notes, targetPrice, initialOffer } = parsed.data;
   const product = await prisma.product.create({
     data: {
       listId,
       name,
       notes: notes || null,
+      targetPrice: targetPrice ?? null,
       offers: initialOffer
         ? {
             create: {
               store: initialOffer.store,
+              sellerName: initialOffer.sellerName || null,
               url: initialOffer.url,
               titleSnapshot: initialOffer.titleSnapshot ?? null,
               basePrice: initialOffer.basePrice,
@@ -61,16 +65,7 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json(
-    {
-      product: {
-        id: product.id,
-        listId: product.listId,
-        name: product.name,
-        notes: product.notes,
-        createdAt: product.createdAt.toISOString(),
-        offers: product.offers.map(serializeOffer),
-      },
-    },
+    { product: serializeProduct(product) },
     { status: 201 }
   );
 }

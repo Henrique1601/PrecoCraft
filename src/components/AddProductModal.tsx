@@ -26,6 +26,7 @@ export function AddProductModal({
   const [tab, setTab] = useState<"manual" | "ml">("manual");
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [targetPrice, setTargetPrice] = useState("");
   const [offerUrl, setOfferUrl] = useState("");
   const [offerStore, setOfferStore] = useState<StoreType>("MERCADO_LIVRE");
   const [offerPrice, setOfferPrice] = useState("");
@@ -51,6 +52,9 @@ export function AddProductModal({
     try {
       const hasOffer = offerUrl.trim().length > 0;
       const parsedPrice = Number(offerPrice.replace(",", "."));
+      const parsedTarget = targetPrice.trim()
+        ? Number(targetPrice.replace(",", "."))
+        : null;
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -58,6 +62,10 @@ export function AddProductModal({
           listId,
           name: name.trim(),
           notes: notes.trim() || undefined,
+          targetPrice:
+            parsedTarget !== null && !Number.isNaN(parsedTarget)
+              ? parsedTarget
+              : null,
           initialOffer: hasOffer
             ? {
                 store: offerStore,
@@ -197,17 +205,33 @@ export function AddProductModal({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Observação (opcional)
-                </label>
-                <input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Cor preta, versão 2"
-                  className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Observação (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Ex: Cor preta"
+                    className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Preço Alvo / Meta (R$)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={targetPrice}
+                    onChange={(e) => setTargetPrice(e.target.value)}
+                    placeholder="Opcional"
+                    className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
 
               <div className="pt-2 border-t border-zinc-100 space-y-3">

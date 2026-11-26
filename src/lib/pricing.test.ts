@@ -4,7 +4,10 @@ import {
   calculateFinalPrice,
   detectStoreFromUrl,
   findBestOffer,
+  getBestOfferForStore,
+  getPriceDelta,
 } from "./pricing.ts";
+import { parseCsvProducts } from "./csv.ts";
 
 describe("calculateFinalPrice", () => {
   it("computes base + shipping - discount - cashback", () => {
@@ -64,6 +67,28 @@ describe("findBestOffer", () => {
   });
 });
 
+describe("getBestOfferForStore & getPriceDelta", () => {
+  it("picks cheapest seller within the same store", () => {
+    const res = getBestOfferForStore(
+      [
+        { store: "TIKTOK_SHOP", basePrice: 120, inStock: true },
+        { store: "TIKTOK_SHOP", basePrice: 95, shippingCost: 10, inStock: true },
+      ],
+      "TIKTOK_SHOP"
+    );
+    assert.ok(res);
+    assert.equal(res.totalInStore, 2);
+    assert.equal(res.best.basePrice, 95);
+  });
+
+  it("computes price delta when previousBasePrice differs", () => {
+    assert.equal(getPriceDelta(180, 200), -20);
+    assert.equal(getPriceDelta(215, 200), 15);
+    assert.equal(getPriceDelta(200, 200), null);
+    assert.equal(getPriceDelta(200, null), null);
+  });
+});
+
 describe("detectStoreFromUrl", () => {
   it("detects all 5 supported marketplaces", () => {
     assert.equal(
@@ -91,5 +116,21 @@ describe("detectStoreFromUrl", () => {
   it("returns null for invalid or unknown URLs", () => {
     assert.equal(detectStoreFromUrl("not-a-url"), null);
     assert.equal(detectStoreFromUrl("https://example.com/item"), null);
+  });
+});
+
+describe("parseCsvProducts", () => {
+  it("parses semicolon-separated Excel CSV with headers", () => {
+    const csv = `Produto;Observacao;Preco Alvo;URL;Preco
+Mouse Logitech;Preto;350,00;https://www.kabum.com.br/produto/123;399,90
+Teclado Mecânico;;200;;`;
+    const rows = parseCsvProducts(csv);
+    assert.equal(rows.length, 2);
+    assert.equal(rows[0].name, "Mouse Logitech");
+    assert.equal(rows[0].targetPrice, 350);
+    assert.equal(rows[0].store, "KABUM");
+    assert.equal(rows[0].basePrice, 399.9);
+    assert.equal(rows[1].name, "Teclado Mecânico");
+    assert.equal(rows[1].targetPrice, 200);
   });
 });

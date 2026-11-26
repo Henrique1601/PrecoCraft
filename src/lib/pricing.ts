@@ -101,6 +101,38 @@ export function findBestOffer<T extends OfferForComparison>(
   return { bestStore: best.store, bestPrice };
 }
 
+export function getBestOfferForStore<T extends OfferForComparison>(
+  offers: T[],
+  store: StoreType
+): { best: T; totalInStore: number } | null {
+  const storeOffers = offers.filter((o) => o.store === store);
+  if (storeOffers.length === 0) return null;
+
+  const inStock = storeOffers.filter((o) => o.inStock !== false);
+  const candidates = inStock.length > 0 ? inStock : storeOffers;
+
+  let best = candidates[0];
+  let bestPrice = calculateFinalPrice(best);
+  for (let i = 1; i < candidates.length; i++) {
+    const p = calculateFinalPrice(candidates[i]);
+    if (p < bestPrice) {
+      best = candidates[i];
+      bestPrice = p;
+    }
+  }
+  return { best, totalInStore: storeOffers.length };
+}
+
+export function getPriceDelta(
+  currentBase: number,
+  previousBase: number | null
+): number | null {
+  if (previousBase === null || previousBase === undefined) return null;
+  const diff = round2(currentBase - previousBase);
+  if (Math.abs(diff) < 0.01) return null;
+  return diff;
+}
+
 export function detectStoreFromUrl(rawUrl: string): StoreType | null {
   try {
     const host = new URL(rawUrl).hostname.toLowerCase();

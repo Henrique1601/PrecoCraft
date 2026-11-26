@@ -44,15 +44,17 @@ export async function POST(req: Request) {
   for (const offer of offers) {
     const store = offer.store as StoreType;
     if (!STORE_META[store].autoRefresh && !offerId) {
-      // Skip non-auto stores on bulk refresh so we don't spam warnings
       continue;
     }
 
     const res = await refreshOfferFromStore(store, offer.url);
     if (res.ok && res.basePrice !== undefined) {
+      const oldBase = Number(offer.basePrice);
+      const priceChanged = Math.abs(oldBase - res.basePrice) >= 0.01;
       const updated = await prisma.storeOffer.update({
         where: { id: offer.id },
         data: {
+          ...(priceChanged ? { previousBasePrice: oldBase } : {}),
           basePrice: res.basePrice,
           ...(res.titleSnapshot ? { titleSnapshot: res.titleSnapshot } : {}),
           inStock: res.inStock ?? true,

@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { isAuthenticated } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { serializeProduct } from "@/lib/serializers";
 
 const updateProductSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
   notes: z.string().trim().max(300).nullable().optional(),
+  targetPrice: z.number().nonnegative().nullable().optional(),
+  purchased: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -29,9 +32,16 @@ export async function PATCH(
     data: {
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
       ...(parsed.data.notes !== undefined ? { notes: parsed.data.notes } : {}),
+      ...(parsed.data.targetPrice !== undefined
+        ? { targetPrice: parsed.data.targetPrice }
+        : {}),
+      ...(parsed.data.purchased !== undefined
+        ? { purchased: parsed.data.purchased }
+        : {}),
     },
+    include: { offers: true },
   });
-  return NextResponse.json({ product: updated });
+  return NextResponse.json({ product: serializeProduct(updated) });
 }
 
 export async function DELETE(
