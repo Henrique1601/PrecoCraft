@@ -9,6 +9,7 @@ const patchOfferSchema = z.object({
   url: z.string().url().optional(),
   titleSnapshot: z.string().trim().max(240).nullable().optional(),
   basePrice: z.number().nonnegative().optional(),
+  installmentPrice: z.number().nonnegative().nullable().optional(),
   shippingCost: z.number().nonnegative().optional(),
   discountAmount: z.number().nonnegative().optional(),
   cashbackAmount: z.number().nonnegative().optional(),
@@ -36,6 +37,16 @@ export async function PATCH(
   const d = parsed.data;
   const existing = await prisma.storeOffer.findUnique({ where: { id } });
   const oldBase = existing ? Number(existing.basePrice) : null;
+  const oldLowest =
+    existing?.lowestPriceSeen !== null && existing?.lowestPriceSeen !== undefined
+      ? Number(existing.lowestPriceSeen)
+      : oldBase;
+  const nextLowest =
+    d.basePrice !== undefined && d.basePrice > 0
+      ? oldLowest !== null
+        ? Math.min(oldLowest, d.basePrice)
+        : d.basePrice
+      : null;
   const priceChanged =
     d.basePrice !== undefined &&
     oldBase !== null &&
@@ -50,6 +61,10 @@ export async function PATCH(
         ? { titleSnapshot: d.titleSnapshot }
         : {}),
       ...(priceChanged ? { previousBasePrice: oldBase } : {}),
+      ...(nextLowest !== null ? { lowestPriceSeen: nextLowest } : {}),
+      ...(d.installmentPrice !== undefined
+        ? { installmentPrice: d.installmentPrice }
+        : {}),
       ...(d.basePrice !== undefined ? { basePrice: d.basePrice } : {}),
       ...(d.shippingCost !== undefined ? { shippingCost: d.shippingCost } : {}),
       ...(d.discountAmount !== undefined

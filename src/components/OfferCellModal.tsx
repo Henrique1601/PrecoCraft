@@ -40,6 +40,12 @@ export function OfferCellModal({
   const [basePrice, setBasePrice] = useState(
     activeOffer ? String(activeOffer.basePrice) : ""
   );
+  const [installmentPrice, setInstallmentPrice] = useState(
+    activeOffer?.installmentPrice !== null &&
+      activeOffer?.installmentPrice !== undefined
+      ? String(activeOffer.installmentPrice)
+      : ""
+  );
   const [shippingCost, setShippingCost] = useState(
     activeOffer ? String(activeOffer.shippingCost) : "0"
   );
@@ -60,6 +66,11 @@ export function OfferCellModal({
     setSellerName(next?.sellerName ?? "");
     setUrl(next?.url ?? "");
     setBasePrice(next ? String(next.basePrice) : "");
+    setInstallmentPrice(
+      next?.installmentPrice !== null && next?.installmentPrice !== undefined
+        ? String(next.installmentPrice)
+        : ""
+    );
     setShippingCost(next ? String(next.shippingCost) : "0");
     setDiscountAmount(next ? String(next.discountAmount) : "0");
     setCashbackAmount(next ? String(next.cashbackAmount) : "0");
@@ -80,6 +91,9 @@ export function OfferCellModal({
     setMessage(null);
     try {
       const parsedBase = Number(basePrice.replace(",", "."));
+      const parsedInstallment = installmentPrice.trim()
+        ? Number(installmentPrice.replace(",", "."))
+        : null;
       const res = await fetch("/api/offers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,6 +104,10 @@ export function OfferCellModal({
           sellerName: sellerName.trim() || null,
           url: url.trim(),
           basePrice: Number.isNaN(parsedBase) ? undefined : parsedBase,
+          installmentPrice:
+            parsedInstallment !== null && !Number.isNaN(parsedInstallment)
+              ? parsedInstallment
+              : null,
           shippingCost: Number(shippingCost.replace(",", ".")) || 0,
           discountAmount: Number(discountAmount.replace(",", ".")) || 0,
           cashbackAmount: Number(cashbackAmount.replace(",", ".")) || 0,
@@ -255,7 +273,7 @@ export function OfferCellModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-zinc-700 mb-1">
-                Preço Base (R$)
+                Preço Pix / À vista (R$)
               </label>
               <input
                 type="number"
@@ -265,6 +283,21 @@ export function OfferCellModal({
                 value={basePrice}
                 onChange={(e) => setBasePrice(e.target.value)}
                 placeholder={meta.autoRefresh ? "Auto ou digite" : "0.00"}
+                className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-zinc-700 mb-1">
+                Preço Cartão / Parcelado
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={installmentPrice}
+                onChange={(e) => setInstallmentPrice(e.target.value)}
+                placeholder="Opcional"
                 className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg tabular-nums focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
@@ -297,7 +330,7 @@ export function OfferCellModal({
               />
             </div>
 
-            <div>
+            <div className="col-span-2">
               <label className="block text-xs font-medium text-zinc-700 mb-1">
                 Cashback (R$)
               </label>
@@ -313,9 +346,17 @@ export function OfferCellModal({
           </div>
 
           <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-3.5 py-2.5">
-            <span className="text-xs font-medium text-emerald-900">
-              Preço Final Real
-            </span>
+            <div>
+              <span className="text-xs font-medium text-emerald-900 block">
+                Preço Final Real (À vista)
+              </span>
+              {activeOffer?.lowestPriceSeen !== null &&
+                activeOffer?.lowestPriceSeen !== undefined && (
+                  <span className="text-[11px] text-emerald-700 tabular-nums">
+                    Mínimo já visto: {formatBRL(activeOffer.lowestPriceSeen)}
+                  </span>
+                )}
+            </div>
             <span className="text-base font-bold text-emerald-700 tabular-nums">
               {formatBRL(previewFinal)}
             </span>

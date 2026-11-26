@@ -10,6 +10,8 @@ export interface SerializedOffer {
   titleSnapshot: string | null;
   basePrice: number;
   previousBasePrice: number | null;
+  lowestPriceSeen: number | null;
+  installmentPrice: number | null;
   shippingCost: number;
   discountAmount: number;
   cashbackAmount: number;
@@ -47,6 +49,10 @@ export function serializeOffer(offer: StoreOffer): SerializedOffer {
     basePrice: Number(offer.basePrice),
     previousBasePrice:
       offer.previousBasePrice !== null ? Number(offer.previousBasePrice) : null,
+    lowestPriceSeen:
+      offer.lowestPriceSeen !== null ? Number(offer.lowestPriceSeen) : null,
+    installmentPrice:
+      offer.installmentPrice !== null ? Number(offer.installmentPrice) : null,
     shippingCost: Number(offer.shippingCost),
     discountAmount: Number(offer.discountAmount),
     cashbackAmount: Number(offer.cashbackAmount),

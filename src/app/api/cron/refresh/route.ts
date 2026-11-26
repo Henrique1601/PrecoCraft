@@ -63,11 +63,15 @@ export async function GET(req: Request) {
       const res = await refreshOfferFromStore(store, offer.url);
       if (res.ok && res.basePrice !== undefined) {
         const oldBase = Number(offer.basePrice);
+        const oldLowest =
+          offer.lowestPriceSeen !== null ? Number(offer.lowestPriceSeen) : oldBase;
+        const nextLowest = Math.min(oldLowest, res.basePrice);
         const priceChanged = Math.abs(oldBase - res.basePrice) >= 0.01;
         await prisma.storeOffer.update({
           where: { id: offer.id },
           data: {
             ...(priceChanged ? { previousBasePrice: oldBase } : {}),
+            lowestPriceSeen: nextLowest,
             basePrice: res.basePrice,
             inStock: res.inStock ?? true,
             sourceMode: "AUTO",

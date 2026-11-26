@@ -2,10 +2,12 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   calculateFinalPrice,
+  calculateSingleStoreTotals,
   detectStoreFromUrl,
   findBestOffer,
   getBestOfferForStore,
   getPriceDelta,
+  sortProducts,
 } from "./pricing.ts";
 import { parseCsvProducts } from "./csv.ts";
 
@@ -132,5 +134,51 @@ Teclado Mecânico;;200;;`;
     assert.equal(rows[0].basePrice, 399.9);
     assert.equal(rows[1].name, "Teclado Mecânico");
     assert.equal(rows[1].targetPrice, 200);
+  });
+});
+
+describe("payment mode, single-store totals & sorting", () => {
+  it("uses installmentPrice when mode is installment", () => {
+    const offer = { basePrice: 900, installmentPrice: 1000, shippingCost: 20 };
+    assert.equal(calculateFinalPrice(offer, "cash"), 920);
+    assert.equal(calculateFinalPrice(offer, "installment"), 1020);
+  });
+
+  it("summarizes single-store coverage and totals", () => {
+    const totals = calculateSingleStoreTotals([
+      {
+        purchased: false,
+        offers: [
+          { store: "MERCADO_LIVRE", basePrice: 100 },
+          { store: "AMAZON", basePrice: 120 },
+        ],
+      },
+      {
+        purchased: false,
+        offers: [{ store: "MERCADO_LIVRE", basePrice: 200 }],
+      },
+    ]);
+    assert.equal(totals[0].store, "MERCADO_LIVRE");
+    assert.equal(totals[0].coveredCount, 2);
+    assert.equal(totals[0].totalPrice, 300);
+  });
+
+  it("sorts target-hit products first when sortBy is target_first", () => {
+    const sorted = sortProducts(
+      [
+        {
+          targetPrice: 100,
+          purchased: false,
+          offers: [{ store: "AMAZON", basePrice: 150 }],
+        },
+        {
+          targetPrice: 200,
+          purchased: false,
+          offers: [{ store: "KABUM", basePrice: 180 }],
+        },
+      ],
+      "target_first"
+    );
+    assert.equal(sorted[0].targetPrice, 200);
   });
 });

@@ -17,5 +17,14 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/svg+xml",
       },
     ],
+    share_target: {
+      action: "/quick-add",
+      method: "GET",
+      params: {
+        title: "title",
+        text: "text",
+        url: "url",
+      },
+    },
   };
 }

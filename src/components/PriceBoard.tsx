@@ -10,20 +10,26 @@ import {
   FolderPlus,
   Link2,
   LogOut,
+  Pencil,
   Plus,
   RefreshCw,
+  Search,
   Target,
   Trash2,
   Upload,
 } from "lucide-react";
 import {
   calculateFinalPrice,
+  calculateSingleStoreTotals,
   findBestOffer,
   formatBRL,
   getBestOfferForStore,
   getPriceDelta,
+  sortProducts,
   STORE_META,
   STORE_TYPES,
+  type PaymentMode,
+  type SortMode,
   type StoreType,
 } from "@/lib/pricing";
 import { exportListToCsv } from "@/lib/csv";
@@ -52,6 +58,9 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   const [creatingList, setCreatingList] = useState(false);
   const [newListName, setNewListName] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("pending");
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [showImportCsv, setShowImportCsv] = useState(false);
   const [showBookmarklet, setShowBookmarklet] = useState(false);
@@ -71,27 +80,41 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
 
   const filteredProducts = useMemo(() => {
     if (!activeList) return [];
-    if (filterMode === "pending") {
-      return activeList.products.filter((p) => !p.purchased);
-    }
-    if (filterMode === "purchased") {
-      return activeList.products.filter((p) => p.purchased);
-    }
-    return activeList.products;
-  }, [activeList, filterMode]);
+    const q = searchQuery.trim().toLowerCase();
+    const byStatus = activeList.products.filter((p) => {
+      if (filterMode === "pending" && p.purchased) return false;
+      if (filterMode === "purchased" && !p.purchased) return false;
+      if (q) {
+        const matchName = p.name.toLowerCase().includes(q);
+        const matchNotes = p.notes?.toLowerCase().includes(q) ?? false;
+        if (!matchName && !matchNotes) return false;
+      }
+      return true;
+    });
+    return sortProducts(byStatus, sortMode, paymentMode);
+  }, [activeList, filterMode, searchQuery, sortMode, paymentMode]);
 
-  const { pendingTotal, purchasedTotal } = useMemo(() => {
-    if (!activeList) return { pendingTotal: 0, purchasedTotal: 0 };
+  const { pendingTotal, purchasedTotal, singleStoreTotals } = useMemo(() => {
+    if (!activeList) {
+      return { pendingTotal: 0, purchasedTotal: 0, singleStoreTotals: [] };
+    }
     let pending = 0;
     let purchased = 0;
     for (const p of activeList.products) {
-      const best = findBestOffer(p.offers);
+      const best = findBestOffer(p.offers, paymentMode);
       const val = best ? best.bestPrice : 0;
       if (p.purchased) purchased += val;
       else pending += val;
     }
-    return { pendingTotal: pending, purchasedTotal: purchased };
-  }, [activeList]);
+    return {
+      pendingTotal: pending,
+      purchasedTotal: purchased,
+      singleStoreTotals: calculateSingleStoreTotals(
+        activeList.products,
+        paymentMode
+      ),
+    };
+  }, [activeList, paymentMode]);
 
   async function handleCreateList(e: React.FormEvent) {
     e.preventDefault();
@@ -110,6 +133,23 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
     }
   }
 
+  async function handleRenameList(list: SerializedList) {
+    const nextName = prompt("Novo nome da lista:", list.name);
+    if (!nextName || !nextName.trim() || nextName.trim() === list.name) return;
+    const res = await fetch(`/api/lists/${list.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: nextName.trim() }),
+    });
+    if (res.ok) {
+      setLists((prev) =>
+        prev.map((l) =>
+          l.id === list.id ? { ...l, name: nextName.trim() } : l
+        )
+      );
+    }
+  }
+
   async function handleDeleteList(listId: string) {
     if (!confirm("Excluir esta lista e todos os seus produtos?")) return;
     const res = await fetch(`/api/lists/${listId}`, { method: "DELETE" });
@@ -119,6 +159,42 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
       if (activeListId === listId) {
         setActiveListId(next[0]?.id ?? "");
       }
+    }
+  }
+
+  async function handleEditProduct(product: SerializedProduct) {
+    const nextName = prompt("Nome do produto:", product.name);
+    if (!nextName || !nextName.trim()) return;
+    const nextNotes = prompt("Observação (opcional):", product.notes ?? "");
+    if (nextNotes === null) return;
+
+    const res = await fetch(`/api/products/${product.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: nextName.trim(),
+        notes: nextNotes.trim() || null,
+      }),
+    });
+    if (res.ok) {
+      setLists((prev) =>
+        prev.map((l) =>
+          l.id === product.listId
+            ? {
+                ...l,
+                products: l.products.map((p) =>
+                  p.id === product.id
+                    ? {
+                        ...p,
+                        name: nextName.trim(),
+                        notes: nextNotes.trim() || null,
+                      }
+                    : p
+                ),
+              }
+            : l
+        )
+      );
     }
   }
 
@@ -460,34 +536,111 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
           </div>
         ) : (
           <>
-            {/* Summary & Filter Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-zinc-200 rounded-xl px-4 py-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-sm font-semibold text-zinc-900">
-                  {activeList.name}
-                </h1>
-
-                <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg text-[11px] font-medium">
-                  {(
-                    [
-                      ["pending", "Falta comprar"],
-                      ["purchased", "Comprados"],
-                      ["all", "Todos"],
-                    ] as const
-                  ).map(([key, label]) => (
+            {/* Summary, Search, Sort, Payment Mode & CSV Bar */}
+            <div className="bg-white border border-zinc-200 rounded-xl px-4 py-3 space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1">
+                    <h1 className="text-sm font-semibold text-zinc-900">
+                      {activeList.name}
+                    </h1>
                     <button
-                      key={key}
                       type="button"
-                      onClick={() => setFilterMode(key)}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${
-                        filterMode === key
-                          ? "bg-white text-zinc-900 shadow-2xs"
-                          : "text-zinc-500 hover:text-zinc-800"
-                      }`}
+                      onClick={() => handleRenameList(activeList)}
+                      title="Renomear lista"
+                      className="p-1 text-zinc-400 hover:text-zinc-800 rounded"
                     >
-                      {label}
+                      <Pencil className="w-3 h-3" />
                     </button>
-                  ))}
+                  </div>
+
+                  <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg text-[11px] font-medium">
+                    {(
+                      [
+                        ["pending", "Falta comprar"],
+                        ["purchased", "Comprados"],
+                        ["all", "Todos"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setFilterMode(key)}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${
+                          filterMode === key
+                            ? "bg-white text-zinc-900 shadow-2xs"
+                            : "text-zinc-500 hover:text-zinc-800"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg text-[11px] font-medium">
+                    {(
+                      [
+                        ["cash", "Pix / À vista"],
+                        ["installment", "Cartão"],
+                      ] as const
+                    ).map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setPaymentMode(mode)}
+                        className={`px-2.5 py-1 rounded-md transition-colors ${
+                          paymentMode === mode
+                            ? "bg-emerald-600 text-white shadow-2xs"
+                            : "text-zinc-500 hover:text-zinc-800"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-xs">
+                  <div>
+                    <span className="text-zinc-500">Falta comprar: </span>
+                    <span className="font-bold text-emerald-700 text-sm tabular-nums">
+                      {formatBRL(pendingTotal)}
+                    </span>
+                  </div>
+                  {purchasedTotal > 0 && (
+                    <div className="hidden sm:block">
+                      <span className="text-zinc-500">Já comprado: </span>
+                      <span className="font-semibold text-zinc-700 tabular-nums">
+                        {formatBRL(purchasedTotal)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar item..."
+                      className="pl-8 pr-3 py-1 text-xs border border-zinc-200 rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44 sm:w-56"
+                    />
+                  </div>
+
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                    className="px-2.5 py-1 text-xs border border-zinc-200 rounded-lg bg-white text-zinc-700"
+                  >
+                    <option value="recent">Ordenar: Mais recentes</option>
+                    <option value="target_first">Na meta primeiro</option>
+                    <option value="price_asc">Menor preço</option>
+                    <option value="price_desc">Maior preço</option>
+                  </select>
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -517,22 +670,25 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 text-xs">
-                <div>
-                  <span className="text-zinc-500">Falta comprar: </span>
-                  <span className="font-bold text-emerald-700 text-sm tabular-nums">
-                    {formatBRL(pendingTotal)}
+              {singleStoreTotals.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-100 text-[11px] text-zinc-600">
+                  <span className="font-medium text-zinc-500">
+                    Simulador (tudo em 1 loja):
                   </span>
-                </div>
-                {purchasedTotal > 0 && (
-                  <div className="hidden sm:block">
-                    <span className="text-zinc-500">Já comprado: </span>
-                    <span className="font-semibold text-zinc-700 tabular-nums">
-                      {formatBRL(purchasedTotal)}
+                  {singleStoreTotals.map((s) => (
+                    <span
+                      key={s.store}
+                      className="px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 tabular-nums"
+                    >
+                      <strong>{STORE_META[s.store].shortLabel}</strong> (
+                      {s.coveredCount}/{s.totalCount}):{" "}
+                      <span className="font-semibold text-zinc-900">
+                        {formatBRL(s.totalPrice)}
+                      </span>
                     </span>
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {filteredProducts.length === 0 ? (
@@ -540,7 +696,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 <p className="text-sm font-medium text-zinc-800">
                   {activeList.products.length === 0
                     ? "Lista vazia"
-                    : "Nenhum item neste filtro"}
+                    : "Nenhum item encontrado"}
                 </p>
                 <p className="text-xs text-zinc-500">
                   Adicione apenas os itens que você quer monitorar ou importe
@@ -598,7 +754,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                     </thead>
                     <tbody className="divide-y divide-zinc-200">
                       {filteredProducts.map((product) => {
-                        const best = findBestOffer(product.offers);
+                        const best = findBestOffer(product.offers, paymentMode);
                         const hitTarget =
                           best !== null &&
                           product.targetPrice !== null &&
@@ -672,16 +828,26 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                   </div>
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    handleDeleteProduct(product.id)
-                                  }
-                                  title="Remover produto"
-                                  className="p-1 text-zinc-300 hover:text-red-600 rounded shrink-0"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleEditProduct(product)}
+                                    title="Editar produto"
+                                    className="p-1 text-zinc-300 hover:text-zinc-700 rounded"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteProduct(product.id)
+                                    }
+                                    title="Remover produto"
+                                    className="p-1 text-zinc-300 hover:text-red-600 rounded"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
                               </div>
                             </td>
 
@@ -691,11 +857,12 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                               );
                               const storeBest = getBestOfferForStore(
                                 product.offers,
-                                st
+                                st,
+                                paymentMode
                               );
                               const offer = storeBest?.best ?? null;
                               const finalPrice = offer
-                                ? calculateFinalPrice(offer)
+                                ? calculateFinalPrice(offer, paymentMode)
                                 : null;
                               const delta = offer
                                 ? getPriceDelta(
@@ -772,6 +939,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                         </p>
                                       )}
 
+                                      {offer.lowestPriceSeen !== null &&
+                                        offer.lowestPriceSeen <
+                                          offer.basePrice && (
+                                          <p className="text-[10px] text-zinc-400 tabular-nums">
+                                            Mín: {formatBRL(offer.lowestPriceSeen)}
+                                          </p>
+                                        )}
+
                                       {(offer.shippingCost > 0 ||
                                         offer.discountAmount > 0 ||
                                         offer.cashbackAmount > 0) && (
@@ -825,7 +1000,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 {/* Mobile Compact Cards */}
                 <div className="md:hidden space-y-3">
                   {filteredProducts.map((product) => {
-                    const best = findBestOffer(product.offers);
+                    const best = findBestOffer(product.offers, paymentMode);
                     const hitTarget =
                       best !== null &&
                       product.targetPrice !== null &&
@@ -868,13 +1043,22 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                               )}
                             </div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="p-1 text-zinc-400 hover:text-red-600"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditProduct(product)}
+                              className="p-1 text-zinc-400 hover:text-zinc-700"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              className="p-1 text-zinc-400 hover:text-red-600"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2">
@@ -884,11 +1068,12 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                             );
                             const storeBest = getBestOfferForStore(
                               product.offers,
-                              st
+                              st,
+                              paymentMode
                             );
                             const offer = storeBest?.best ?? null;
                             const finalPrice = offer
-                              ? calculateFinalPrice(offer)
+                              ? calculateFinalPrice(offer, paymentMode)
                               : null;
                             const isWinner =
                               best !== null &&

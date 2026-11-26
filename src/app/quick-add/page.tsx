@@ -9,13 +9,28 @@ export const instant = false;
 export default async function QuickAddPage({
   searchParams,
 }: {
-  searchParams: Promise<{ url?: string; title?: string; price?: string }>;
+  searchParams: Promise<{
+    url?: string;
+    text?: string;
+    title?: string;
+    price?: string;
+  }>;
 }) {
   if (!(await isAuthenticated())) {
     return <LoginGate />;
   }
 
   const params = await searchParams;
+  let resolvedUrl = params.url ?? "";
+  if (!resolvedUrl && params.text) {
+    const match = params.text.match(/https?:\/\/\S+/i);
+    if (match) resolvedUrl = match[0];
+  }
+  const resolvedTitle =
+    params.title ||
+    (params.text && resolvedUrl
+      ? params.text.replace(resolvedUrl, "").trim()
+      : "");
   let lists: SerializedList[] = [];
   try {
     const rows = await prisma.list.findMany({
@@ -35,8 +50,8 @@ export default async function QuickAddPage({
   return (
     <QuickAddClient
       lists={lists}
-      initialUrl={params.url ?? ""}
-      initialTitle={params.title ?? ""}
+      initialUrl={resolvedUrl}
+      initialTitle={resolvedTitle}
       initialPrice={params.price ?? ""}
     />
   );

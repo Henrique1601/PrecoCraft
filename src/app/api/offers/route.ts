@@ -14,6 +14,7 @@ const upsertOfferSchema = z.object({
   url: z.string().url(),
   titleSnapshot: z.string().trim().max(240).nullable().optional(),
   basePrice: z.number().nonnegative().optional(),
+  installmentPrice: z.number().nonnegative().nullable().optional(),
   shippingCost: z.number().nonnegative().optional(),
   discountAmount: z.number().nonnegative().optional(),
   cashbackAmount: z.number().nonnegative().optional(),
@@ -59,6 +60,16 @@ export async function POST(req: Request) {
       where: { id: data.id },
     });
     const oldBase = existing ? Number(existing.basePrice) : null;
+    const oldLowest =
+      existing?.lowestPriceSeen !== null && existing?.lowestPriceSeen !== undefined
+        ? Number(existing.lowestPriceSeen)
+        : oldBase;
+    const nextLowest =
+      basePrice > 0
+        ? oldLowest !== null
+          ? Math.min(oldLowest, basePrice)
+          : basePrice
+        : oldLowest;
     const priceChanged = oldBase !== null && Math.abs(oldBase - basePrice) >= 0.01;
 
     const updated = await prisma.storeOffer.update({
@@ -69,6 +80,10 @@ export async function POST(req: Request) {
         url: data.url,
         ...(titleSnapshot !== null ? { titleSnapshot } : {}),
         ...(priceChanged ? { previousBasePrice: oldBase } : {}),
+        ...(nextLowest !== null ? { lowestPriceSeen: nextLowest } : {}),
+        ...(data.installmentPrice !== undefined
+          ? { installmentPrice: data.installmentPrice }
+          : {}),
         basePrice,
         ...(data.shippingCost !== undefined
           ? { shippingCost: data.shippingCost }
@@ -98,6 +113,8 @@ export async function POST(req: Request) {
       url: data.url,
       titleSnapshot,
       basePrice,
+      lowestPriceSeen: basePrice > 0 ? basePrice : null,
+      installmentPrice: data.installmentPrice ?? null,
       shippingCost: data.shippingCost ?? 0,
       discountAmount: data.discountAmount ?? 0,
       cashbackAmount: data.cashbackAmount ?? 0,
