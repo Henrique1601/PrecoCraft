@@ -1,6 +1,8 @@
 {
   "name": "precocraft",
   "version": "0.1.0",
+  "description": "Personal price comparison spreadsheet across Mercado Livre, Amazon, AliExpress, KaBuM!, and TikTok Shop.",
+  "keywords": ["nextjs", "prisma", "postgresql", "price-tracker", "pwa", "tailwindcss"],
   "private": true,
   "scripts": {
     "dev": "next dev",
