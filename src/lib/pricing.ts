@@ -16,6 +16,7 @@ export interface StoreMeta {
   shortLabel: string;
   autoRefresh: boolean;
   badgeClass: string;
+  dotClass: string;
 }
 
 export const STORE_META: Record<StoreType, StoreMeta> = {
@@ -25,6 +26,7 @@ export const STORE_META: Record<StoreType, StoreMeta> = {
     shortLabel: "ML",
     autoRefresh: true,
     badgeClass: "bg-yellow-100 text-yellow-900 border-yellow-300",
+    dotClass: "bg-yellow-400",
   },
   AMAZON: {
     id: "AMAZON",
@@ -32,6 +34,7 @@ export const STORE_META: Record<StoreType, StoreMeta> = {
     shortLabel: "Amazon",
     autoRefresh: false,
     badgeClass: "bg-amber-100 text-amber-900 border-amber-300",
+    dotClass: "bg-amber-500",
   },
   ALIEXPRESS: {
     id: "ALIEXPRESS",
@@ -39,6 +42,7 @@ export const STORE_META: Record<StoreType, StoreMeta> = {
     shortLabel: "AliExpress",
     autoRefresh: false,
     badgeClass: "bg-orange-100 text-orange-900 border-orange-300",
+    dotClass: "bg-orange-500",
   },
   KABUM: {
     id: "KABUM",
@@ -46,6 +50,7 @@ export const STORE_META: Record<StoreType, StoreMeta> = {
     shortLabel: "KaBuM",
     autoRefresh: true,
     badgeClass: "bg-sky-100 text-sky-900 border-sky-300",
+    dotClass: "bg-sky-500",
   },
   TIKTOK_SHOP: {
     id: "TIKTOK_SHOP",
@@ -53,6 +58,7 @@ export const STORE_META: Record<StoreType, StoreMeta> = {
     shortLabel: "TikTok",
     autoRefresh: false,
     badgeClass: "bg-zinc-900 text-white border-zinc-700",
+    dotClass: "bg-pink-500",
   },
 };
 
@@ -111,6 +117,19 @@ export function findBestOffer<T extends OfferForComparison>(
   }
 
   return { bestStore: best.store, bestPrice };
+}
+
+export function calculateSavings<T extends OfferForComparison>(
+  offers: T[],
+  mode: PaymentMode = "cash"
+): number | null {
+  const inStock = offers.filter((o) => o.inStock !== false);
+  if (inStock.length < 2) return null;
+  const prices = inStock
+    .map((o) => calculateFinalPrice(o, mode))
+    .sort((a, b) => a - b);
+  const diff = round2(prices[1] - prices[0]);
+  return diff > 0.01 ? diff : null;
 }
 
 export function getBestOfferForStore<T extends OfferForComparison>(

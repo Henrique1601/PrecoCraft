@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   calculateFinalPrice,
+  calculateSavings,
   calculateSingleStoreTotals,
   detectStoreFromUrl,
   findBestOffer,
@@ -180,5 +181,18 @@ describe("payment mode, single-store totals & sorting", () => {
       "target_first"
     );
     assert.equal(sorted[0].targetPrice, 200);
+  });
+
+  it("calculates savings between cheapest and second cheapest offer", () => {
+    const savings = calculateSavings([
+      { store: "AMAZON", basePrice: 250, inStock: true },
+      { store: "MERCADO_LIVRE", basePrice: 200, inStock: true },
+      { store: "KABUM", basePrice: 300, inStock: true },
+    ]);
+    assert.equal(savings, 50);
+    assert.equal(
+      calculateSavings([{ store: "AMAZON", basePrice: 250, inStock: true }]),
+      null
+    );
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Bookmark,
@@ -10,17 +10,22 @@ import {
   FolderPlus,
   Link2,
   LogOut,
+  Moon,
+  MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Sparkles,
+  Sun,
   Target,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import {
   calculateFinalPrice,
+  calculateSavings,
   calculateSingleStoreTotals,
   findBestOffer,
   formatBRL,
@@ -67,14 +72,40 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   const [showMagicLink, setShowMagicLink] = useState(false);
   const [showImportCsv, setShowImportCsv] = useState(false);
   const [showBookmarklet, setShowBookmarklet] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [refreshingList, setRefreshingList] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
 
   const [editingCell, setEditingCell] = useState<{
     product: SerializedProduct;
     store: StoreType;
     offers: SerializedOffer[];
   } | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("precocraft_theme");
+    const prefersDark =
+      saved === "dark" ||
+      (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.classList.toggle("dark", prefersDark);
+    const id = requestAnimationFrame(() => setDarkMode(prefersDark));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function toggleDarkMode() {
+    const next = !darkMode;
+    setDarkMode(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("precocraft_theme", next ? "dark" : "light");
+  }
+
+  function showToast(msg: string) {
+    setStatusMsg(msg);
+    setTimeout(() => {
+      setStatusMsg((curr) => (curr === msg ? null : curr));
+    }, 4500);
+  }
 
   const activeList = useMemo(
     () => lists.find((l) => l.id === activeListId) ?? lists[0] ?? null,
@@ -162,6 +193,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
       if (activeListId === listId) {
         setActiveListId(next[0]?.id ?? "");
       }
+      setShowToolsMenu(false);
     }
   }
 
@@ -285,7 +317,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
           : l
       )
     );
-    setStatusMsg(`${products.length} produto(s) importado(s) do CSV!`);
+    showToast(`${products.length} produto(s) importado(s) do CSV!`);
   }
 
   function handleExportCsv() {
@@ -298,6 +330,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
     a.download = `${activeList.name.toLowerCase().replace(/\s+/g, "-")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowToolsMenu(false);
   }
 
   function handleOfferSaved(offer: SerializedOffer) {
@@ -333,7 +366,6 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   async function handleRefreshList() {
     if (!activeList) return;
     setRefreshingList(true);
-    setStatusMsg(null);
     try {
       const res = await fetch("/api/offers/refresh", {
         method: "POST",
@@ -347,7 +379,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
             handleOfferSaved(r.offer);
           }
         }
-        setStatusMsg(
+        showToast(
           `Atualizado: ${data.updatedCount} de ${data.checked} oferta(s) (ML e KaBuM!).`
         );
       }
@@ -362,16 +394,16 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-zinc-50">
+    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-zinc-950">
       {/* Top Header */}
-      <header className="bg-white border-b border-zinc-200 sticky top-0 z-30">
+      <header className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-base font-bold tracking-tight text-zinc-900">
-              Preco<span className="text-emerald-600">Craft</span>
+            <span className="text-base font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
+              Preco<span className="text-emerald-600 dark:text-emerald-400">Craft</span>
             </span>
-            <span className="hidden lg:inline-block text-xs text-zinc-400">
-              Planilha limpa de preços reais
+            <span className="hidden lg:inline-block text-xs text-zinc-400 dark:text-zinc-500">
+              Comparador limpo de preços reais
             </span>
           </div>
 
@@ -379,21 +411,11 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
             <Link
               href="/quick-add"
               title="Colar link rápido (ideal no celular)"
-              className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 border border-zinc-300 bg-white hover:bg-zinc-50 rounded-lg flex items-center gap-1.5"
+              className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-lg flex items-center gap-1.5"
             >
-              <Link2 className="w-3.5 h-3.5 text-emerald-600" />
+              <Link2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span className="hidden sm:inline">Colar Link</span>
             </Link>
-
-            <button
-              type="button"
-              onClick={() => setShowBookmarklet(true)}
-              title="Bookmarklet 1-Clique"
-              className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 border border-zinc-300 bg-white hover:bg-zinc-50 rounded-lg flex items-center gap-1.5"
-            >
-              <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="hidden md:inline">Bookmarklet</span>
-            </button>
 
             {activeList && (
               <>
@@ -402,21 +424,21 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                   onClick={handleRefreshList}
                   disabled={refreshingList}
                   title="Atualizar ML e KaBuM!"
-                  className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 border border-zinc-300 bg-white hover:bg-zinc-50 rounded-lg flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-2.5 py-1.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-700 rounded-lg flex items-center gap-1.5 disabled:opacity-50"
                 >
                   <RefreshCw
                     className={`w-3.5 h-3.5 ${
                       refreshingList ? "animate-spin" : ""
                     }`}
                   />
-                  <span className="hidden md:inline">Atualizar ML/KaBuM</span>
+                  <span className="hidden md:inline">Atualizar</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setShowMagicLink(true)}
                   title="Colar link e buscar nos outros mercados"
-                  className="px-2.5 py-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg flex items-center gap-1.5 shadow-2xs"
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Link Mágico</span>
@@ -425,20 +447,93 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 <button
                   type="button"
                   onClick={() => setShowAddProduct(true)}
-                  className="px-3 py-1.5 text-xs font-medium bg-zinc-900 text-white hover:bg-zinc-800 rounded-lg flex items-center gap-1.5"
+                  className="px-3 py-1.5 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 hover:bg-zinc-800 dark:hover:bg-white rounded-lg flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Novo Produto</span>
+                  <span className="hidden sm:inline">Produto</span>
                 </button>
               </>
             )}
+
+            {/* Compact Tools Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowToolsMenu((v) => !v)}
+                title="Mais ferramentas"
+                className="p-1.5 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+
+              {showToolsMenu && (
+                <div className="absolute right-0 mt-1.5 w-52 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg py-1.5 z-40 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowToolsMenu(false);
+                      setShowBookmarklet(true);
+                    }}
+                    className="w-full px-3.5 py-2 text-left text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                  >
+                    <Bookmark className="w-3.5 h-3.5 text-emerald-600" />
+                    Bookmarklet & Extensão
+                  </button>
+                  {activeList && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowToolsMenu(false);
+                          setShowImportCsv(true);
+                        }}
+                        className="w-full px-3.5 py-2 text-left text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Importar CSV (Excel)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleExportCsv}
+                        className="w-full px-3.5 py-2 text-left text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        Exportar CSV
+                      </button>
+                      <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteList(activeList.id)}
+                        className="w-full px-3.5 py-2 text-left text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 flex items-center gap-2"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Excluir lista atual
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={toggleDarkMode}
+              title={darkMode ? "Modo claro" : "Modo escuro"}
+              className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              {darkMode ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+            </button>
 
             {authEnabled && (
               <button
                 type="button"
                 onClick={handleLogout}
                 title="Sair"
-                className="p-1.5 text-zinc-500 hover:text-zinc-900 rounded-lg hover:bg-zinc-100"
+                className="p-1.5 text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -460,16 +555,16 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 onClick={() => setActiveListId(list.id)}
                 className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 shrink-0 ${
                   isActive
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                    ? "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900"
+                    : "bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700"
                 }`}
               >
                 {list.name}
                 <span
                   className={`text-[10px] px-1.5 rounded-full ${
                     isActive
-                      ? "bg-zinc-700 text-zinc-200"
-                      : "bg-zinc-200 text-zinc-600"
+                      ? "bg-zinc-700 dark:bg-zinc-300 text-zinc-200 dark:text-zinc-800"
+                      : "bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300"
                   }`}
                 >
                   {pendingCount}
@@ -486,7 +581,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 value={newListName}
                 onChange={(e) => setNewListName(e.target.value)}
                 placeholder="Nome da lista..."
-                className="px-2.5 py-1 text-xs border border-zinc-300 rounded-lg bg-white w-36 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="px-2.5 py-1 text-xs border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 w-36 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
               <button
                 type="submit"
@@ -497,7 +592,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
               <button
                 type="button"
                 onClick={() => setCreatingList(false)}
-                className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-800"
+                className="px-2 py-1 text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
               >
                 Cancelar
               </button>
@@ -506,7 +601,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
             <button
               type="button"
               onClick={() => setCreatingList(true)}
-              className="px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg flex items-center gap-1 shrink-0"
+              className="px-2.5 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg flex items-center gap-1 shrink-0"
             >
               <FolderPlus className="w-3.5 h-3.5" />
               Nova Lista
@@ -517,57 +612,44 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 space-y-4">
-        {statusMsg && (
-          <div className="text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 px-3.5 py-2 rounded-lg flex items-center justify-between">
-            <span>{statusMsg}</span>
-            <button
-              type="button"
-              onClick={() => setStatusMsg(null)}
-              className="text-emerald-700 hover:underline"
-            >
-              Fechar
-            </button>
-          </div>
-        )}
-
         {!activeList ? (
-          <div className="bg-white border border-zinc-200 rounded-xl p-10 text-center space-y-3">
-            <p className="text-sm font-medium text-zinc-800">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
+            <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
               Nenhuma lista criada ainda.
             </p>
-            <p className="text-xs text-zinc-500">
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Crie sua primeira lista (ex: Setup PC, Casa, Compras do Mês) para
               começar a comparar preços.
             </p>
             <button
               type="button"
               onClick={() => setCreatingList(true)}
-              className="px-4 py-2 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800"
+              className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800"
             >
               + Criar Primeira Lista
             </button>
           </div>
         ) : (
           <>
-            {/* Summary, Search, Sort, Payment Mode & CSV Bar */}
-            <div className="bg-white border border-zinc-200 rounded-xl px-4 py-3 space-y-2.5">
+            {/* Summary, Search, Sort & Payment Mode Bar */}
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl px-4 py-3 space-y-2.5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <div className="flex items-center gap-1">
-                    <h1 className="text-sm font-semibold text-zinc-900">
+                    <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
                       {activeList.name}
                     </h1>
                     <button
                       type="button"
                       onClick={() => handleRenameList(activeList)}
                       title="Renomear lista"
-                      className="p-1 text-zinc-400 hover:text-zinc-800 rounded"
+                      className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
                     >
                       <Pencil className="w-3 h-3" />
                     </button>
                   </div>
 
-                  <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg text-[11px] font-medium">
+                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg text-[11px] font-medium">
                     {(
                       [
                         ["pending", "Falta comprar"],
@@ -581,8 +663,8 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                         onClick={() => setFilterMode(key)}
                         className={`px-2.5 py-1 rounded-md transition-colors ${
                           filterMode === key
-                            ? "bg-white text-zinc-900 shadow-2xs"
-                            : "text-zinc-500 hover:text-zinc-800"
+                            ? "bg-white dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 shadow-2xs"
+                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
                         }`}
                       >
                         {label}
@@ -590,7 +672,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                     ))}
                   </div>
 
-                  <div className="flex items-center bg-zinc-100 p-0.5 rounded-lg text-[11px] font-medium">
+                  <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg text-[11px] font-medium">
                     {(
                       [
                         ["cash", "Pix / À vista"],
@@ -604,7 +686,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                         className={`px-2.5 py-1 rounded-md transition-colors ${
                           paymentMode === mode
                             ? "bg-emerald-600 text-white shadow-2xs"
-                            : "text-zinc-500 hover:text-zinc-800"
+                            : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
                         }`}
                       >
                         {label}
@@ -615,15 +697,19 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
 
                 <div className="flex items-center gap-4 text-xs">
                   <div>
-                    <span className="text-zinc-500">Falta comprar: </span>
-                    <span className="font-bold text-emerald-700 text-sm tabular-nums">
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      Falta comprar:{" "}
+                    </span>
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400 text-sm tabular-nums">
                       {formatBRL(pendingTotal)}
                     </span>
                   </div>
                   {purchasedTotal > 0 && (
                     <div className="hidden sm:block">
-                      <span className="text-zinc-500">Já comprado: </span>
-                      <span className="font-semibold text-zinc-700 tabular-nums">
+                      <span className="text-zinc-500 dark:text-zinc-400">
+                        Já comprado:{" "}
+                      </span>
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300 tabular-nums">
                         {formatBRL(purchasedTotal)}
                       </span>
                     </div>
@@ -631,7 +717,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="relative">
                     <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -640,14 +726,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Buscar item..."
-                      className="pl-8 pr-3 py-1 text-xs border border-zinc-200 rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44 sm:w-56"
+                      className="pl-8 pr-3 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-44 sm:w-56"
                     />
                   </div>
 
                   <select
                     value={sortMode}
                     onChange={(e) => setSortMode(e.target.value as SortMode)}
-                    className="px-2.5 py-1 text-xs border border-zinc-200 rounded-lg bg-white text-zinc-700"
+                    className="px-2.5 py-1 text-xs border border-zinc-200 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200"
                   >
                     <option value="recent">Ordenar: Mais recentes</option>
                     <option value="target_first">Na meta primeiro</option>
@@ -656,103 +742,87 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                   </select>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setShowImportCsv(true)}
-                    className="px-2 py-1 text-[11px] text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md flex items-center gap-1"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Importar CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportCsv}
-                    className="px-2 py-1 text-[11px] text-zinc-600 hover:text-zinc-900 border border-zinc-200 rounded-md flex items-center gap-1"
-                  >
-                    <Download className="w-3 h-3" />
-                    Exportar CSV
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteList(activeList.id)}
-                    className="text-[11px] text-zinc-400 hover:text-red-600 px-1.5"
-                  >
-                    Excluir lista
-                  </button>
-                </div>
-              </div>
-
-              {singleStoreTotals.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-100 text-[11px] text-zinc-600">
-                  <span className="font-medium text-zinc-500">
-                    Simulador (tudo em 1 loja):
-                  </span>
-                  {singleStoreTotals.map((s) => (
-                    <span
-                      key={s.store}
-                      className="px-2 py-0.5 rounded-md bg-zinc-100 border border-zinc-200 tabular-nums"
-                    >
-                      <strong>{STORE_META[s.store].shortLabel}</strong> (
-                      {s.coveredCount}/{s.totalCount}):{" "}
-                      <span className="font-semibold text-zinc-900">
-                        {formatBRL(s.totalPrice)}
-                      </span>
+                {singleStoreTotals.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-600 dark:text-zinc-400">
+                    <span className="text-zinc-400 dark:text-zinc-500">
+                      1 loja:
                     </span>
-                  ))}
-                </div>
-              )}
+                    {singleStoreTotals.slice(0, 3).map((s) => (
+                      <span
+                        key={s.store}
+                        className="px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 tabular-nums inline-flex items-center gap-1"
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            STORE_META[s.store].dotClass
+                          }`}
+                        />
+                        <strong>{STORE_META[s.store].shortLabel}</strong> (
+                        {s.coveredCount}/{s.totalCount}):{" "}
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+                          {formatBRL(s.totalPrice)}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {filteredProducts.length === 0 ? (
-              <div className="bg-white border border-zinc-200 rounded-xl p-10 text-center space-y-3">
-                <p className="text-sm font-medium text-zinc-800">
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-10 text-center space-y-3">
+                <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
                   {activeList.products.length === 0
                     ? "Lista vazia"
                     : "Nenhum item encontrado"}
                 </p>
-                <p className="text-xs text-zinc-500">
-                  Adicione apenas os itens que você quer monitorar ou importe
-                  sua planilha CSV.
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Use o <strong>Link Mágico</strong> para colar uma URL e buscar
+                  nos outros mercados, ou adicione manualmente.
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowAddProduct(true)}
-                    className="px-4 py-2 text-xs font-medium bg-zinc-900 text-white rounded-lg hover:bg-zinc-800"
+                    onClick={() => setShowMagicLink(true)}
+                    className="px-4 py-2 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
                   >
-                    + Adicionar Produto
+                    Link Mágico
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowImportCsv(true)}
-                    className="px-4 py-2 text-xs font-medium border border-zinc-300 text-zinc-700 rounded-lg hover:bg-zinc-50"
+                    onClick={() => setShowAddProduct(true)}
+                    className="px-4 py-2 text-xs font-medium bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 rounded-lg hover:bg-zinc-800"
                   >
-                    Importar CSV
+                    + Adicionar Produto
                   </button>
                 </div>
               </div>
             ) : (
               <>
                 {/* Desktop Excel-style Table */}
-                <div className="hidden md:block bg-white border border-zinc-200 rounded-xl overflow-x-auto shadow-xs">
+                <div className="hidden md:block bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-x-auto shadow-xs">
                   <table className="w-full border-collapse text-left text-xs">
                     <thead>
-                      <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-600">
-                        <th className="py-2.5 px-3.5 font-semibold min-w-[230px] border-r border-zinc-200">
+                      <tr className="bg-zinc-50 dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        <th className="sticky left-0 z-10 bg-zinc-50 dark:bg-zinc-900 py-2.5 px-3.5 font-semibold min-w-[230px] border-r border-zinc-200 dark:border-zinc-800">
                           Produto
                         </th>
                         {STORE_TYPES.map((st) => (
                           <th
                             key={st}
-                            className="py-2.5 px-3 font-semibold min-w-[140px] border-r border-zinc-200"
+                            className="py-2.5 px-3 font-semibold min-w-[140px] border-r border-zinc-200 dark:border-zinc-800"
                           >
-                            <div className="flex items-center justify-between gap-1">
-                              <span>{STORE_META[st].label}</span>
+                            <div className="flex items-center justify-between gap-1.5">
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  className={`w-2 h-2 rounded-full shrink-0 ${STORE_META[st].dotClass}`}
+                                />
+                                {STORE_META[st].label}
+                              </span>
                               {STORE_META[st].autoRefresh && (
                                 <span
                                   title="Suporta atualização automática"
-                                  className="text-[10px] font-normal text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded"
+                                  className="text-[10px] font-normal text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded"
                                 >
                                   Auto
                                 </span>
@@ -760,14 +830,18 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                             </div>
                           </th>
                         ))}
-                        <th className="py-2.5 px-3.5 font-semibold min-w-[140px] bg-emerald-50/60 text-emerald-900">
+                        <th className="py-2.5 px-3.5 font-semibold min-w-[145px] bg-emerald-50/60 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-300">
                           Melhor Preço
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-200">
+                    <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                       {filteredProducts.map((product) => {
                         const best = findBestOffer(product.offers, paymentMode);
+                        const savings = calculateSavings(
+                          product.offers,
+                          paymentMode
+                        );
                         const hitTarget =
                           best !== null &&
                           product.targetPrice !== null &&
@@ -776,11 +850,13 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                         return (
                           <tr
                             key={product.id}
-                            className={`hover:bg-zinc-50/70 transition-colors ${
-                              product.purchased ? "opacity-60 bg-zinc-50/50" : ""
+                            className={`hover:bg-zinc-50/70 dark:hover:bg-zinc-800/40 transition-colors ${
+                              product.purchased
+                                ? "opacity-60 bg-zinc-50/50 dark:bg-zinc-900/30"
+                                : ""
                             }`}
                           >
-                            <td className="py-2.5 px-3.5 border-r border-zinc-200 align-top">
+                            <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 py-2.5 px-3.5 border-r border-zinc-200 dark:border-zinc-800 align-top">
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex items-start gap-2 min-w-0">
                                   <button
@@ -796,7 +872,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                     className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                       product.purchased
                                         ? "bg-emerald-600 border-emerald-600 text-white"
-                                        : "border-zinc-300 hover:border-emerald-500"
+                                        : "border-zinc-300 dark:border-zinc-600 hover:border-emerald-500"
                                     }`}
                                   >
                                     {product.purchased && (
@@ -806,14 +882,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
 
                                   <div className="min-w-0">
                                     <p
-                                      className={`font-medium text-zinc-900 leading-snug ${
+                                      className={`font-medium text-zinc-900 dark:text-zinc-100 leading-snug ${
                                         product.purchased ? "line-through" : ""
                                       }`}
                                     >
                                       {product.name}
                                     </p>
                                     {product.notes && (
-                                      <p className="text-[11px] text-zinc-500 mt-0.5">
+                                      <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                                         {product.notes}
                                       </p>
                                     )}
@@ -823,7 +899,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                         onClick={() =>
                                           handleUpdateTargetPrice(product)
                                         }
-                                        className="text-[10px] text-zinc-500 hover:text-zinc-900 flex items-center gap-0.5 tabular-nums"
+                                        className="text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-0.5 tabular-nums"
                                       >
                                         <Target className="w-3 h-3" />
                                         {product.targetPrice !== null
@@ -833,7 +909,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                           : "Definir meta"}
                                       </button>
                                       {hitTarget && !product.purchased && (
-                                        <span className="text-[10px] font-semibold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
+                                        <span className="text-[10px] font-semibold px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded">
                                           Na meta!
                                         </span>
                                       )}
@@ -846,7 +922,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                     type="button"
                                     onClick={() => handleEditProduct(product)}
                                     title="Editar produto"
-                                    className="p-1 text-zinc-300 hover:text-zinc-700 rounded"
+                                    className="p-1 text-zinc-300 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-200 rounded"
                                   >
                                     <Pencil className="w-3 h-3" />
                                   </button>
@@ -856,7 +932,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                       handleDeleteProduct(product.id)
                                     }
                                     title="Remover produto"
-                                    className="p-1 text-zinc-300 hover:text-red-600 rounded"
+                                    className="p-1 text-zinc-300 dark:text-zinc-600 hover:text-red-600 rounded"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
                                   </button>
@@ -899,10 +975,10 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                       offers: storeOffers,
                                     })
                                   }
-                                  className={`py-2 px-3 border-r border-zinc-200 align-top cursor-pointer transition-colors group ${
+                                  className={`py-2 px-3 border-r border-zinc-200 dark:border-zinc-800 align-top cursor-pointer transition-colors group ${
                                     isWinner
-                                      ? "bg-emerald-50 hover:bg-emerald-100/70"
-                                      : "hover:bg-zinc-100/70"
+                                      ? "bg-emerald-50/90 dark:bg-emerald-950/40 hover:bg-emerald-100/70 dark:hover:bg-emerald-950/60"
+                                      : "hover:bg-zinc-100/70 dark:hover:bg-zinc-800/60"
                                   }`}
                                 >
                                   {offer && finalPrice !== null ? (
@@ -913,15 +989,15 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                             !offer.inStock
                                               ? "line-through text-zinc-400"
                                               : isWinner
-                                                ? "text-emerald-700"
-                                                : "text-zinc-900"
+                                                ? "text-emerald-700 dark:text-emerald-400"
+                                                : "text-zinc-900 dark:text-zinc-100"
                                           }`}
                                         >
                                           {formatBRL(finalPrice)}
                                         </span>
                                         <div className="flex items-center gap-1">
                                           {storeOffers.length > 1 && (
-                                            <span className="text-[10px] px-1 bg-zinc-200 text-zinc-700 rounded">
+                                            <span className="text-[10px] px-1 bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 rounded">
                                               +{storeOffers.length - 1}
                                             </span>
                                           )}
@@ -931,7 +1007,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
                                             title="Abrir na loja"
-                                            className="text-zinc-400 hover:text-zinc-700"
+                                            className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                                           >
                                             <ExternalLink className="w-3 h-3" />
                                           </a>
@@ -942,8 +1018,8 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                         <p
                                           className={`text-[10px] font-medium tabular-nums ${
                                             delta < 0
-                                              ? "text-emerald-700"
-                                              : "text-red-600"
+                                              ? "text-emerald-700 dark:text-emerald-400"
+                                              : "text-red-600 dark:text-red-400"
                                           }`}
                                         >
                                           {delta < 0
@@ -955,7 +1031,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                       {offer.lowestPriceSeen !== null &&
                                         offer.lowestPriceSeen <
                                           offer.basePrice && (
-                                          <p className="text-[10px] text-zinc-400 tabular-nums">
+                                          <p className="text-[10px] text-zinc-400 dark:text-zinc-500 tabular-nums">
                                             Mín: {formatBRL(offer.lowestPriceSeen)}
                                           </p>
                                         )}
@@ -963,7 +1039,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                       {(offer.shippingCost > 0 ||
                                         offer.discountAmount > 0 ||
                                         offer.cashbackAmount > 0) && (
-                                        <p className="text-[10px] text-zinc-500 tabular-nums">
+                                        <p className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
                                           Base {formatBRL(offer.basePrice)}
                                           {offer.shippingCost > 0 &&
                                             ` +${offer.shippingCost}`}
@@ -975,13 +1051,13 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                       )}
 
                                       {!offer.inStock && (
-                                        <span className="inline-block text-[10px] text-red-600 font-medium">
+                                        <span className="inline-block text-[10px] text-red-600 dark:text-red-400 font-medium">
                                           Sem estoque
                                         </span>
                                       )}
                                     </div>
                                   ) : (
-                                    <div className="h-8 flex items-center text-[11px] text-zinc-300 group-hover:text-zinc-600">
+                                    <div className="h-8 flex items-center text-[11px] text-zinc-300 dark:text-zinc-700 group-hover:text-zinc-600 dark:group-hover:text-zinc-400">
                                       + Adicionar
                                     </div>
                                   )}
@@ -989,15 +1065,20 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                               );
                             })}
 
-                            <td className="py-2.5 px-3.5 align-top bg-emerald-50/30">
+                            <td className="py-2.5 px-3.5 align-top bg-emerald-50/30 dark:bg-emerald-950/20">
                               {best ? (
-                                <div>
-                                  <p className="font-bold text-emerald-700 tabular-nums">
+                                <div className="space-y-0.5">
+                                  <p className="font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
                                     {formatBRL(best.bestPrice)}
                                   </p>
-                                  <p className="text-[11px] text-emerald-800/80">
+                                  <p className="text-[11px] text-emerald-800/80 dark:text-emerald-300/80">
                                     {STORE_META[best.bestStore].label}
                                   </p>
+                                  {savings !== null && (
+                                    <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                                      Economiza {formatBRL(savings)}
+                                    </p>
+                                  )}
                                 </div>
                               ) : (
                                 <span className="text-zinc-400">—</span>
@@ -1010,57 +1091,74 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                   </table>
                 </div>
 
-                {/* Mobile Compact Cards */}
+                {/* Mobile Clean Cards (only active stores + quick chips for missing) */}
                 <div className="md:hidden space-y-3">
                   {filteredProducts.map((product) => {
                     const best = findBestOffer(product.offers, paymentMode);
+                    const savings = calculateSavings(
+                      product.offers,
+                      paymentMode
+                    );
                     const hitTarget =
                       best !== null &&
                       product.targetPrice !== null &&
                       best.bestPrice <= product.targetPrice;
 
+                    const activeStores = STORE_TYPES.filter((st) =>
+                      product.offers.some((o) => o.store === st)
+                    );
+                    const missingStores = STORE_TYPES.filter(
+                      (st) => !product.offers.some((o) => o.store === st)
+                    );
+
                     return (
                       <div
                         key={product.id}
-                        className={`bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2.5 ${
+                        className={`bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-3.5 space-y-2.5 ${
                           product.purchased ? "opacity-65" : ""
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-start gap-2">
+                          <div className="flex items-start gap-2 min-w-0">
                             <button
                               type="button"
                               onClick={() => handleTogglePurchased(product)}
                               className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                                 product.purchased
                                   ? "bg-emerald-600 border-emerald-600 text-white"
-                                  : "border-zinc-300"
+                                  : "border-zinc-300 dark:border-zinc-600"
                               }`}
                             >
                               {product.purchased && (
                                 <Check className="w-3 h-3" />
                               )}
                             </button>
-                            <div>
+                            <div className="min-w-0">
                               <h3
-                                className={`text-sm font-semibold text-zinc-900 ${
+                                className={`text-sm font-semibold text-zinc-900 dark:text-zinc-100 leading-snug ${
                                   product.purchased ? "line-through" : ""
                                 }`}
                               >
                                 {product.name}
                               </h3>
                               {hitTarget && !product.purchased && (
-                                <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
+                                <span className="inline-block mt-0.5 text-[10px] font-semibold px-1.5 py-0.2 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded">
                                   Na meta ({formatBRL(product.targetPrice!)})
                                 </span>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center gap-1">
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {best && (
+                              <span className="px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-xs font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                                {formatBRL(best.bestPrice)}
+                              </span>
+                            )}
                             <button
                               type="button"
                               onClick={() => handleEditProduct(product)}
-                              className="p-1 text-zinc-400 hover:text-zinc-700"
+                              className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                             >
                               <Pencil className="w-3.5 h-3.5" />
                             </button>
@@ -1074,27 +1172,81 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          {STORE_TYPES.map((st) => {
-                            const storeOffers = product.offers.filter(
-                              (o) => o.store === st
-                            );
-                            const storeBest = getBestOfferForStore(
-                              product.offers,
-                              st,
-                              paymentMode
-                            );
-                            const offer = storeBest?.best ?? null;
-                            const finalPrice = offer
-                              ? calculateFinalPrice(offer, paymentMode)
-                              : null;
-                            const isWinner =
-                              best !== null &&
-                              offer !== null &&
-                              best.bestStore === st &&
-                              offer.inStock;
+                        {activeStores.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {activeStores.map((st) => {
+                              const storeOffers = product.offers.filter(
+                                (o) => o.store === st
+                              );
+                              const storeBest = getBestOfferForStore(
+                                product.offers,
+                                st,
+                                paymentMode
+                              );
+                              const offer = storeBest?.best ?? null;
+                              const finalPrice = offer
+                                ? calculateFinalPrice(offer, paymentMode)
+                                : null;
+                              const isWinner =
+                                best !== null &&
+                                offer !== null &&
+                                best.bestStore === st &&
+                                offer.inStock;
 
-                            return (
+                              return (
+                                <button
+                                  key={st}
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingCell({
+                                      product,
+                                      store: st,
+                                      offers: storeOffers,
+                                    })
+                                  }
+                                  className={`text-left p-2 rounded-lg border text-xs ${
+                                    isWinner
+                                      ? "bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700"
+                                      : "bg-zinc-50 dark:bg-zinc-800/70 border-zinc-200 dark:border-zinc-700"
+                                  }`}
+                                >
+                                  <div className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 flex items-center justify-between">
+                                    <span className="inline-flex items-center gap-1">
+                                      <span
+                                        className={`w-1.5 h-1.5 rounded-full ${STORE_META[st].dotClass}`}
+                                      />
+                                      {STORE_META[st].shortLabel}
+                                    </span>
+                                    {storeOffers.length > 1 && (
+                                      <span>+{storeOffers.length - 1}</span>
+                                    )}
+                                  </div>
+                                  {offer && finalPrice !== null && (
+                                    <div
+                                      className={`font-bold tabular-nums mt-0.5 ${
+                                        isWinner
+                                          ? "text-emerald-700 dark:text-emerald-400"
+                                          : "text-zinc-900 dark:text-zinc-100"
+                                      }`}
+                                    >
+                                      {formatBRL(finalPrice)}
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {savings !== null && (
+                          <p className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 tabular-nums">
+                            Economiza {formatBRL(savings)} vs. 2ª opção
+                          </p>
+                        )}
+
+                        {missingStores.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                            {missingStores.map((st) => (
                               <button
                                 key={st}
                                 type="button"
@@ -1102,40 +1254,16 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                   setEditingCell({
                                     product,
                                     store: st,
-                                    offers: storeOffers,
+                                    offers: [],
                                   })
                                 }
-                                className={`text-left p-2 rounded-lg border text-xs ${
-                                  isWinner
-                                    ? "bg-emerald-50 border-emerald-300"
-                                    : "bg-zinc-50 border-zinc-200"
-                                }`}
+                                className="px-2 py-0.5 text-[10px] text-zinc-500 dark:text-zinc-400 border border-dashed border-zinc-300 dark:border-zinc-700 rounded-md hover:border-zinc-500"
                               >
-                                <div className="text-[10px] font-medium text-zinc-500 flex items-center justify-between">
-                                  <span>{STORE_META[st].shortLabel}</span>
-                                  {storeOffers.length > 1 && (
-                                    <span>+{storeOffers.length - 1}</span>
-                                  )}
-                                </div>
-                                {offer && finalPrice !== null ? (
-                                  <div
-                                    className={`font-bold tabular-nums mt-0.5 ${
-                                      isWinner
-                                        ? "text-emerald-700"
-                                        : "text-zinc-900"
-                                    }`}
-                                  >
-                                    {formatBRL(finalPrice)}
-                                  </div>
-                                ) : (
-                                  <div className="text-[11px] text-zinc-400 mt-0.5">
-                                    + Adicionar
-                                  </div>
-                                )}
+                                + {STORE_META[st].shortLabel}
                               </button>
-                            );
-                          })}
-                        </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -1145,6 +1273,20 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
           </>
         )}
       </main>
+
+      {/* Floating Toast */}
+      {statusMsg && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-sm bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-xs px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-3">
+          <span>{statusMsg}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMsg(null)}
+            className="opacity-70 hover:opacity-100"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {showAddProduct && activeList && (
         <AddProductModal
