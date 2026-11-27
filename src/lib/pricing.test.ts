@@ -6,8 +6,11 @@ import {
   calculateSingleStoreTotals,
   detectStoreFromUrl,
   findBestOffer,
+  formatRelativeAge,
+  formatWhatsAppSummary,
   getBestOfferForStore,
   getPriceDelta,
+  hasPriceDrop,
   sortProducts,
 } from "./pricing.ts";
 import { parseCsvProducts } from "./csv.ts";
@@ -194,5 +197,39 @@ describe("payment mode, single-store totals & sorting", () => {
       calculateSavings([{ store: "AMAZON", basePrice: 250, inStock: true }]),
       null
     );
+  });
+
+  it("formats relative age and flags stale prices >= 7 days", () => {
+    const now = Date.UTC(2026, 10, 27, 12, 0, 0);
+    assert.deepEqual(
+      formatRelativeAge(new Date(now - 2 * 3600 * 1000).toISOString(), now),
+      { label: "hoje", isStale: false }
+    );
+    assert.deepEqual(
+      formatRelativeAge(new Date(now - 8 * 86400 * 1000).toISOString(), now),
+      { label: "há 8d", isStale: true }
+    );
+  });
+
+  it("detects price drops and builds WhatsApp summary", () => {
+    assert.equal(
+      hasPriceDrop([{ basePrice: 180, previousBasePrice: 200 }]),
+      true
+    );
+    const summary = formatWhatsAppSummary("Setup PC", [
+      {
+        name: "Mouse",
+        purchased: false,
+        offers: [
+          {
+            store: "KABUM",
+            basePrice: 200,
+            url: "https://www.kabum.com.br/p/1",
+          },
+        ],
+      },
+    ]);
+    assert.ok(summary.includes("*Setup PC*"));
+    assert.ok(summary.includes("KaBuM!"));
   });
 });

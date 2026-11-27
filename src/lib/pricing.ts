@@ -282,3 +282,52 @@ export function formatBRL(value: number): string {
     currency: "BRL",
   }).format(value);
 }
+
+export function formatRelativeAge(
+  isoDate: string,
+  nowMs: number = Date.now()
+): { label: string; isStale: boolean } {
+  const ts = new Date(isoDate).getTime();
+  if (Number.isNaN(ts)) return { label: "—", isStale: false };
+  const diffDays = Math.max(0, Math.floor((nowMs - ts) / (1000 * 60 * 60 * 24)));
+  if (diffDays === 0) return { label: "hoje", isStale: false };
+  if (diffDays === 1) return { label: "há 1d", isStale: false };
+  return { label: `há ${diffDays}d`, isStale: diffDays >= 7 };
+}
+
+export function hasPriceDrop(
+  offers: Array<{ basePrice: number; previousBasePrice: number | null }>
+): boolean {
+  return offers.some(
+    (o) => o.previousBasePrice !== null && o.basePrice < o.previousBasePrice
+  );
+}
+
+export function formatWhatsAppSummary(
+  listName: string,
+  products: Array<{
+    name: string;
+    purchased: boolean;
+    offers: Array<OfferForComparison & { url: string }>;
+  }>,
+  mode: PaymentMode = "cash"
+): string {
+  const pending = products.filter((p) => !p.purchased);
+  if (pending.length === 0) {
+    return `*${listName}* — Nenhum item pendente.`;
+  }
+
+  let total = 0;
+  const lines = pending.map((p) => {
+    const best = findBestOffer(p.offers, mode);
+    if (!best) return `• ${p.name}: sem ofertas`;
+    total = round2(total + best.bestPrice);
+    const bestOffer = getBestOfferForStore(p.offers, best.bestStore, mode)?.best;
+    const linkPart = bestOffer?.url ? `\n  ${bestOffer.url}` : "";
+    return `• *${p.name}* — ${formatBRL(best.bestPrice)} (${STORE_META[best.bestStore].label})${linkPart}`;
+  });
+
+  return `*${listName}* (${mode === "cash" ? "Pix/À vista" : "Cartão"})\n\n${lines.join(
+    "\n"
+  )}\n\n*Total otimizado:* ${formatBRL(total)}`;
+}

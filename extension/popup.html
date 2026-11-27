@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <style>
       body {
-        width: 300px;
+        width: 320px;
         margin: 0;
         padding: 14px;
         font-family: system-ui, -apple-system, sans-serif;
@@ -13,22 +13,28 @@
       }
       h1 {
         font-size: 14px;
-        margin: 0 0 8px;
+        margin: 0 0 10px;
       }
       label {
         display: block;
         font-size: 11px;
         color: #52525b;
-        margin-bottom: 4px;
+        margin-bottom: 3px;
       }
-      input {
+      input, select {
         width: 100%;
         box-sizing: border-box;
         padding: 7px 9px;
         font-size: 12px;
         border: 1px solid #d4d4d8;
         border-radius: 6px;
-        margin-bottom: 10px;
+        margin-bottom: 9px;
+        background: #fff;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
       }
       button {
         width: 100%;
@@ -40,22 +46,53 @@
         background: #059669;
         color: #fff;
         cursor: pointer;
+        margin-bottom: 6px;
       }
       button:hover {
         background: #047857;
       }
+      button.secondary {
+        background: #fff;
+        color: #3f3f46;
+        border: 1px solid #d4d4d8;
+        font-weight: 500;
+      }
+      button.secondary:hover {
+        background: #f4f4f5;
+      }
       .status {
         font-size: 11px;
-        color: #71717a;
-        margin-top: 8px;
+        color: #52525b;
+        margin-top: 4px;
       }
     </style>
   </head>
   <body>
-    <h1>PrecoCraft — Captura Rápida</h1>
-    <label for="appUrl">URL do seu PrecoCraft</label>
+    <h1>PrecoCraft — Captura 1-Clique</h1>
+    <label for="appUrl">URL do PrecoCraft</label>
     <input id="appUrl" type="url" placeholder="https://precocraft.netlify.app" />
-    <button id="captureBtn">Capturar desta página</button>
+
+    <div class="row">
+      <div>
+        <label for="priceInput">Preço (R$)</label>
+        <input id="priceInput" type="number" step="0.01" placeholder="0.00" />
+      </div>
+      <div>
+        <label for="listSelect">Lista</label>
+        <select id="listSelect"></select>
+      </div>
+    </div>
+
+    <label for="productSelect">Produto</label>
+    <select id="productSelect">
+      <option value="__new__">+ Criar novo produto</option>
+    </select>
+
+    <label for="titleInput">Nome do Produto</label>
+    <input id="titleInput" type="text" placeholder="Nome do produto" />
+
+    <button id="saveDirectBtn">Salvar Direto</button>
+    <button id="openTabBtn" class="secondary">Abrir tela completa (/quick-add)</button>
     <div id="status" class="status"></div>
     <script src="popup.js"></script>
   </body>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Bookmark,
   Check,
+  Copy,
   Download,
   ExternalLink,
   FolderPlus,
@@ -29,8 +30,11 @@ import {
   calculateSingleStoreTotals,
   findBestOffer,
   formatBRL,
+  formatRelativeAge,
+  formatWhatsAppSummary,
   getBestOfferForStore,
   getPriceDelta,
+  hasPriceDrop,
   sortProducts,
   STORE_META,
   STORE_TYPES,
@@ -46,6 +50,7 @@ import type {
 } from "@/lib/serializers";
 import { AddProductModal } from "./AddProductModal";
 import { BookmarkletModal } from "./BookmarkletModal";
+import { EditProductModal } from "./EditProductModal";
 import { ImportCsvModal } from "./ImportCsvModal";
 import { MagicLinkModal } from "./MagicLinkModal";
 import { OfferCellModal } from "./OfferCellModal";
@@ -55,7 +60,7 @@ interface PriceBoardProps {
   authEnabled: boolean;
 }
 
-type FilterMode = "all" | "pending" | "purchased";
+type FilterMode = "all" | "pending" | "purchased" | "drops";
 
 export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   const [lists, setLists] = useState<SerializedList[]>(initialLists);
@@ -64,6 +69,8 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   );
   const [creatingList, setCreatingList] = useState(false);
   const [newListName, setNewListName] = useState("");
+  const [renamingList, setRenamingList] = useState(false);
+  const [renameListValue, setRenameListValue] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("pending");
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("cash");
   const [sortMode, setSortMode] = useState<SortMode>("recent");
@@ -76,6 +83,8 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   const [refreshingList, setRefreshingList] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [editingProduct, setEditingProduct] =
+    useState<SerializedProduct | null>(null);
 
   const [editingCell, setEditingCell] = useState<{
     product: SerializedProduct;
@@ -118,6 +127,9 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
     const byStatus = activeList.products.filter((p) => {
       if (filterMode === "pending" && p.purchased) return false;
       if (filterMode === "purchased" && !p.purchased) return false;
+      if (filterMode === "drops" && (p.purchased || !hasPriceDrop(p.offers))) {
+        return false;
+      }
       if (q) {
         const matchName = p.name.toLowerCase().includes(q);
         const matchNotes = p.notes?.toLowerCase().includes(q) ?? false;
@@ -167,21 +179,63 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
     }
   }
 
-  async function handleRenameList(list: SerializedList) {
-    const nextName = prompt("Novo nome da lista:", list.name);
-    if (!nextName || !nextName.trim() || nextName.trim() === list.name) return;
-    const res = await fetch(`/api/lists/${list.id}`, {
+  async function handleSaveRenameList(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeList || !renameListValue.trim()) return;
+    const nextName = renameListValue.trim();
+    const res = await fetch(`/api/lists/${activeList.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: nextName.trim() }),
+      body: JSON.stringify({ name: nextName }),
     });
     if (res.ok) {
       setLists((prev) =>
         prev.map((l) =>
-          l.id === list.id ? { ...l, name: nextName.trim() } : l
+          l.id === activeList.id ? { ...l, name: nextName } : l
         )
       );
+      setRenamingList(false);
     }
+  }
+
+  function handleProductUpdated(
+    updated: SerializedProduct,
+    previousListId: string
+  ) {
+    setLists((prev) =>
+      prev.map((l) => {
+        if (l.id === previousListId && updated.listId !== previousListId) {
+          return {
+            ...l,
+            products: l.products.filter((p) => p.id !== updated.id),
+          };
+        }
+        if (l.id === updated.listId && updated.listId !== previousListId) {
+          return { ...l, products: [...l.products, updated] };
+        }
+        if (l.id === updated.listId) {
+          return {
+            ...l,
+            products: l.products.map((p) =>
+              p.id === updated.id ? updated : p
+            ),
+          };
+        }
+        return l;
+      })
+    );
+  }
+
+  async function handleCopyWhatsApp() {
+    if (!activeList) return;
+    const text = formatWhatsAppSummary(
+      activeList.name,
+      activeList.products,
+      paymentMode
+    );
+    await navigator.clipboard.writeText(text);
+    setShowToolsMenu(false);
+    showToast("Resumo da lista copiado para o WhatsApp!");
   }
 
   async function handleDeleteList(listId: string) {
@@ -194,42 +248,6 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
         setActiveListId(next[0]?.id ?? "");
       }
       setShowToolsMenu(false);
-    }
-  }
-
-  async function handleEditProduct(product: SerializedProduct) {
-    const nextName = prompt("Nome do produto:", product.name);
-    if (!nextName || !nextName.trim()) return;
-    const nextNotes = prompt("Observação (opcional):", product.notes ?? "");
-    if (nextNotes === null) return;
-
-    const res = await fetch(`/api/products/${product.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: nextName.trim(),
-        notes: nextNotes.trim() || null,
-      }),
-    });
-    if (res.ok) {
-      setLists((prev) =>
-        prev.map((l) =>
-          l.id === product.listId
-            ? {
-                ...l,
-                products: l.products.map((p) =>
-                  p.id === product.id
-                    ? {
-                        ...p,
-                        name: nextName.trim(),
-                        notes: nextNotes.trim() || null,
-                      }
-                    : p
-                ),
-              }
-            : l
-        )
-      );
     }
   }
 
@@ -254,48 +272,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
     });
   }
 
-  async function handleUpdateTargetPrice(product: SerializedProduct) {
-    const raw = prompt(
-      `Preço Alvo (Meta) para "${product.name}" (deixe vazio para remover):`,
-      product.targetPrice !== null ? String(product.targetPrice) : ""
-    );
-    if (raw === null) return;
-    const parsed = raw.trim() ? Number(raw.replace(",", ".")) : null;
-    if (parsed !== null && (Number.isNaN(parsed) || parsed < 0)) return;
-
-    const res = await fetch(`/api/products/${product.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ targetPrice: parsed }),
-    });
-    if (res.ok) {
-      setLists((prev) =>
-        prev.map((l) =>
-          l.id === product.listId
-            ? {
-                ...l,
-                products: l.products.map((p) =>
-                  p.id === product.id ? { ...p, targetPrice: parsed } : p
-                ),
-              }
-            : l
-        )
-      );
-    }
-  }
-
   async function handleDeleteProduct(productId: string) {
-    if (!activeList) return;
-    const res = await fetch(`/api/products/${productId}`, { method: "DELETE" });
-    if (res.ok) {
-      setLists((prev) =>
-        prev.map((l) =>
-          l.id === activeList.id
-            ? { ...l, products: l.products.filter((p) => p.id !== productId) }
-            : l
-        )
-      );
-    }
+    setLists((prev) =>
+      prev.map((l) => ({
+        ...l,
+        products: l.products.filter((p) => p.id !== productId),
+      }))
+    );
+    await fetch(`/api/products/${productId}`, { method: "DELETE" });
   }
 
   function handleProductCreated(product: SerializedProduct) {
@@ -500,6 +484,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                         <Download className="w-3.5 h-3.5" />
                         Exportar CSV
                       </button>
+                      <button
+                        type="button"
+                        onClick={handleCopyWhatsApp}
+                        className="w-full px-3.5 py-2 text-left text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center gap-2"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-emerald-600" />
+                        Copiar Resumo (WhatsApp)
+                      </button>
                       <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
                       <button
                         type="button"
@@ -636,23 +628,57 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <div className="flex items-center gap-1">
-                    <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {activeList.name}
-                    </h1>
-                    <button
-                      type="button"
-                      onClick={() => handleRenameList(activeList)}
-                      title="Renomear lista"
-                      className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </button>
+                    {renamingList ? (
+                      <form
+                        onSubmit={handleSaveRenameList}
+                        className="flex items-center gap-1"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={renameListValue}
+                          onChange={(e) => setRenameListValue(e.target.value)}
+                          className="px-2 py-0.5 text-xs font-semibold border border-zinc-300 dark:border-zinc-700 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 w-36"
+                        />
+                        <button
+                          type="submit"
+                          className="px-2 py-0.5 text-[11px] bg-emerald-600 text-white rounded"
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRenamingList(false)}
+                          className="px-1.5 py-0.5 text-[11px] text-zinc-500"
+                        >
+                          X
+                        </button>
+                      </form>
+                    ) : (
+                      <>
+                        <h1 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {activeList.name}
+                        </h1>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRenameListValue(activeList.name);
+                            setRenamingList(true);
+                          }}
+                          title="Renomear lista"
+                          className="p-1 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 rounded"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex items-center bg-zinc-100 dark:bg-zinc-800 p-0.5 rounded-lg text-[11px] font-medium">
                     {(
                       [
                         ["pending", "Falta comprar"],
+                        ["drops", "Quedas ↓"],
                         ["purchased", "Comprados"],
                         ["all", "Todos"],
                       ] as const
@@ -896,9 +922,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                     <div className="flex items-center gap-2 mt-1">
                                       <button
                                         type="button"
-                                        onClick={() =>
-                                          handleUpdateTargetPrice(product)
-                                        }
+                                        onClick={() => setEditingProduct(product)}
                                         className="text-[10px] text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 flex items-center gap-0.5 tabular-nums"
                                       >
                                         <Target className="w-3 h-3" />
@@ -920,7 +944,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                 <div className="flex items-center gap-0.5 shrink-0">
                                   <button
                                     type="button"
-                                    onClick={() => handleEditProduct(product)}
+                                    onClick={() => setEditingProduct(product)}
                                     title="Editar produto"
                                     className="p-1 text-zinc-300 dark:text-zinc-600 hover:text-zinc-700 dark:hover:text-zinc-200 rounded"
                                   >
@@ -1055,6 +1079,23 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                                           Sem estoque
                                         </span>
                                       )}
+
+                                      {(() => {
+                                        const age = formatRelativeAge(
+                                          offer.lastCheckedAt
+                                        );
+                                        return (
+                                          <p
+                                            className={`text-[10px] ${
+                                              age.isStale
+                                                ? "text-amber-600 dark:text-amber-400 font-medium"
+                                                : "text-zinc-400 dark:text-zinc-500"
+                                            }`}
+                                          >
+                                            {age.label}
+                                          </p>
+                                        );
+                                      })()}
                                     </div>
                                   ) : (
                                     <div className="h-8 flex items-center text-[11px] text-zinc-300 dark:text-zinc-700 group-hover:text-zinc-600 dark:group-hover:text-zinc-400">
@@ -1157,7 +1198,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                             )}
                             <button
                               type="button"
-                              onClick={() => handleEditProduct(product)}
+                              onClick={() => setEditingProduct(product)}
                               className="p-1 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
                             >
                               <Pencil className="w-3.5 h-3.5" />
@@ -1325,6 +1366,24 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
           onClose={() => setEditingCell(null)}
           onSaved={handleOfferSaved}
           onDeleted={handleOfferDeleted}
+        />
+      )}
+
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          lists={lists}
+          onClose={() => setEditingProduct(null)}
+          onUpdated={handleProductUpdated}
+          onDuplicated={handleProductCreated}
+          onDeleted={(id) =>
+            setLists((prev) =>
+              prev.map((l) => ({
+                ...l,
+                products: l.products.filter((p) => p.id !== id),
+              }))
+            )
+          }
         />
       )}
     </div>

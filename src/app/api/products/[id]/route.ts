@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { serializeProduct } from "@/lib/serializers";
 
 const updateProductSchema = z.object({
+  listId: z.string().min(1).optional(),
   name: z.string().trim().min(1).max(160).optional(),
   notes: z.string().trim().max(300).nullable().optional(),
   targetPrice: z.number().nonnegative().nullable().optional(),
@@ -30,6 +31,7 @@ export async function PATCH(
   const updated = await prisma.product.update({
     where: { id },
     data: {
+      ...(parsed.data.listId !== undefined ? { listId: parsed.data.listId } : {}),
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
       ...(parsed.data.notes !== undefined ? { notes: parsed.data.notes } : {}),
       ...(parsed.data.targetPrice !== undefined

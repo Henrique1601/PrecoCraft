@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Search, Sparkles, X } from "lucide-react";
+import { Check, ClipboardPaste, Search, Sparkles, X } from "lucide-react";
 import { formatBRL, STORE_META, type StoreType } from "@/lib/pricing";
 import type { SerializedProduct } from "@/lib/serializers";
 import type { MarketSuggestion } from "@/lib/connectors/multi-search";
@@ -176,15 +176,32 @@ export function MagicLinkModal({
         <div className="p-5 space-y-4 overflow-y-auto">
           <form onSubmit={handleLookup} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-zinc-700 mb-1">
-                Cole o link do produto (ou deixe vazio e busque pelo nome)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Cole o link do produto (ou deixe vazio e busque pelo nome)
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const txt = await navigator.clipboard.readText();
+                      if (txt) setUrlInput(txt.trim());
+                    } catch {
+                      // ignore clipboard permission denied
+                    }
+                  }}
+                  className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"
+                >
+                  <ClipboardPaste className="w-3 h-3" />
+                  Colar
+                </button>
+              </div>
               <input
                 type="url"
                 value={urlInput}
                 onChange={(e) => setUrlInput(e.target.value)}
                 placeholder="https://www.amazon.com.br/... ou TikTok Shop / ML / KaBuM"
-                className="w-full px-3 py-2 text-sm border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                className="w-full px-3 py-2 text-sm border border-zinc-300 dark:border-zinc-700 rounded-lg bg-white dark:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
             </div>
 
