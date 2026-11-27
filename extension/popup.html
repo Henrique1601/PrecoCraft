@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        width: 300px;
+        margin: 0;
+        padding: 14px;
+        font-family: system-ui, -apple-system, sans-serif;
+        background: #fafafa;
+        color: #18181b;
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 8px;
+      }
+      label {
+        display: block;
+        font-size: 11px;
+        color: #52525b;
+        margin-bottom: 4px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 9px;
+        font-size: 12px;
+        border: 1px solid #d4d4d8;
+        border-radius: 6px;
+        margin-bottom: 10px;
+      }
+      button {
+        width: 100%;
+        padding: 9px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 0;
+        border-radius: 7px;
+        background: #059669;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #047857;
+      }
+      .status {
+        font-size: 11px;
+        color: #71717a;
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>PrecoCraft — Captura Rápida</h1>
+    <label for="appUrl">URL do seu PrecoCraft</label>
+    <input id="appUrl" type="url" placeholder="https://precocraft.netlify.app" />
+    <button id="captureBtn">Capturar desta página</button>
+    <div id="status" class="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>

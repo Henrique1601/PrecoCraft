@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { extractMlItemId } from "./mercado-livre.ts";
 import { parseKabumHtml } from "./kabum.ts";
+import { cleanProductQuery, extractSlugFromUrl } from "./extract-url.ts";
 
 describe("extractMlItemId", () => {
   it("extracts MLB id from Mercado Livre product URL", () => {
@@ -46,5 +47,21 @@ describe("parseKabumHtml", () => {
     assert.equal(res.ok, true);
     assert.equal(res.basePrice, 1299.5);
     assert.equal(res.titleSnapshot, "Monitor 27");
+  });
+});
+
+describe("cleanProductQuery & extractSlugFromUrl", () => {
+  it("strips marketplace noise from product titles", () => {
+    const clean = cleanProductQuery(
+      "Mouse Logitech G Pro X Superlight [Original] Frete Grátis - Mercado Livre"
+    );
+    assert.equal(clean, "Mouse Logitech G Pro X Superlight");
+  });
+
+  it("extracts readable slug from Amazon URL", () => {
+    const slug = extractSlugFromUrl(
+      "https://www.amazon.com.br/Mouse-Gamer-Logitech-G-Pro/dp/B087LXVH3N"
+    );
+    assert.equal(slug, "Mouse Gamer Logitech G Pro");
   });
 });

@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "PrecoCraft — Captura 1-Clique",
+  "version": "0.1.0",
+  "description": "Captura preço e título do produto aberto (TikTok Shop, Amazon, AliExpress, Mercado Livre, KaBuM) e envia para o PrecoCraft.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Enviar para PrecoCraft"
+  }
+}

@@ -14,6 +14,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Target,
   Trash2,
   Upload,
@@ -41,6 +42,7 @@ import type {
 import { AddProductModal } from "./AddProductModal";
 import { BookmarkletModal } from "./BookmarkletModal";
 import { ImportCsvModal } from "./ImportCsvModal";
+import { MagicLinkModal } from "./MagicLinkModal";
 import { OfferCellModal } from "./OfferCellModal";
 
 interface PriceBoardProps {
@@ -62,6 +64,7 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [showMagicLink, setShowMagicLink] = useState(false);
   const [showImportCsv, setShowImportCsv] = useState(false);
   const [showBookmarklet, setShowBookmarklet] = useState(false);
   const [refreshingList, setRefreshingList] = useState(false);
@@ -407,6 +410,16 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
                     }`}
                   />
                   <span className="hidden md:inline">Atualizar ML/KaBuM</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMagicLink(true)}
+                  title="Colar link e buscar nos outros mercados"
+                  className="px-2.5 py-1.5 text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Link Mágico</span>
                 </button>
 
                 <button
@@ -1137,6 +1150,14 @@ export function PriceBoard({ initialLists, authEnabled }: PriceBoardProps) {
         <AddProductModal
           listId={activeList.id}
           onClose={() => setShowAddProduct(false)}
+          onCreated={handleProductCreated}
+        />
+      )}
+
+      {showMagicLink && activeList && (
+        <MagicLinkModal
+          listId={activeList.id}
+          onClose={() => setShowMagicLink(false)}
           onCreated={handleProductCreated}
         />
       )}

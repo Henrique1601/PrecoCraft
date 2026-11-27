@@ -91,6 +91,23 @@ export function BookmarkletModal({ onClose }: BookmarkletModalProps) {
               )}
             </button>
           </div>
+
+          <div className="pt-3 border-t border-zinc-200 space-y-1.5">
+            <p className="font-semibold text-zinc-800">
+              Prefere Extensão no Chrome / Edge?
+            </p>
+            <p className="text-zinc-600">
+              A extensão pronta está na pasta{" "}
+              <code className="bg-zinc-100 px-1 py-0.5 rounded">extension/</code>{" "}
+              do projeto. Abra{" "}
+              <code className="bg-zinc-100 px-1 py-0.5 rounded">
+                chrome://extensions
+              </code>
+              , ative o <strong>Modo do desenvolvedor</strong> e clique em{" "}
+              <strong>Carregar sem compactação</strong> selecionando a pasta{" "}
+              <code className="bg-zinc-100 px-1 py-0.5 rounded">extension</code>.
+            </p>
+          </div>
         </div>
       </div>
     </div>
